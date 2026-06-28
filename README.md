@@ -11,7 +11,7 @@ It serves:
 ## Structure
 
 ```text
-TzufGuard/
+tzuf-guard/
 ├── api/index.py          # Vercel Python entrypoint
 ├── app/                  # Flask app package
 ├── migrations/           # Alembic migrations
@@ -44,7 +44,7 @@ Production startup fails fast if Turso or secrets are missing.
 ## Install Locally
 
 ```bash
-cd TzufGuard
+cd tzuf-guard
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements-dev.txt
