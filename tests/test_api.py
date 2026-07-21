@@ -1,7 +1,10 @@
 import pytest
+import requests
 
 from app import create_app
+from app.extensions import db
 from app.models import Door, DoorEvent, PushDevice
+from app.services.notifications import NotificationService
 
 from .conftest import auth_headers, login_user, register_user
 
@@ -229,3 +232,128 @@ def test_push_token_registration(client, auth, app):
 
     with app.app_context():
         assert PushDevice.query.count() == 1
+
+
+def test_status_change_sends_expo_push(client, auth, monkeypatch):
+    sent = []
+
+    class StubResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"status": "ok", "id": "ticket-123"}}
+
+    def fake_post(url, **kwargs):
+        sent.append((url, kwargs))
+        return StubResponse()
+
+    monkeypatch.setattr("app.services.notifications.requests.post", fake_post)
+
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={
+            "platform": "ios",
+            "push_token": "ExponentPushToken[valid-token]",
+        },
+    )
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front Door", "token": "expo-secret-token"},
+    )
+    response = client.post(
+        "/api/door-status",
+        json={"token": "expo-secret-token", "status": "opened"},
+    )
+
+    assert response.status_code == 200
+    assert len(sent) == 1
+    url, kwargs = sent[0]
+    assert url == "https://exp.host/--/api/v2/push/send"
+    assert kwargs["json"]["to"] == "ExponentPushToken[valid-token]"
+    assert kwargs["json"]["title"] == "Front Door opened"
+    assert kwargs["json"]["body"] == "Front Door is now opened."
+    assert kwargs["json"]["data"] == {
+        "door_id": str(response.get_json()["door"]["id"]),
+        "status": "opened",
+        "previous_status": "",
+    }
+    assert kwargs["json"]["sound"] == "default"
+    assert kwargs["json"]["priority"] == "high"
+    assert kwargs["timeout"] == 10
+
+
+def test_notification_service_skips_invalid_expo_token(app, monkeypatch):
+    calls = []
+
+    def fake_post(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr("app.services.notifications.requests.post", fake_post)
+
+    with app.app_context():
+        push_device = PushDevice(
+            user_id=1,
+            platform="android",
+            push_token="not-an-expo-token",
+        )
+        push_device.id = 42
+
+        NotificationService().send_push(push_device, "Title", "Body")
+
+    assert calls == []
+
+
+def test_notification_service_deletes_unregistered_device(app, monkeypatch):
+    class StubResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "data": {
+                    "status": "error",
+                    "message": "Device not registered",
+                    "details": {"error": "DeviceNotRegistered"},
+                }
+            }
+
+    monkeypatch.setattr(
+        "app.services.notifications.requests.post", lambda *args, **kwargs: StubResponse()
+    )
+
+    with app.app_context():
+        user = register_user(app.test_client(), email="pushdelete@example.com").get_json()[
+            "user"
+        ]
+        push_device = PushDevice(
+            user_id=user["id"],
+            platform="ios",
+            push_token="ExponentPushToken[stale-token]",
+        )
+        db.session.add(push_device)
+        db.session.commit()
+        push_device_id = push_device.id
+
+        NotificationService().send_push(push_device, "Title", "Body")
+
+        assert db.session.get(PushDevice, push_device_id) is None
+
+
+def test_notification_service_logs_request_failures(app, monkeypatch):
+    def raise_timeout(*args, **kwargs):
+        raise requests.Timeout("too slow")
+
+    monkeypatch.setattr("app.services.notifications.requests.post", raise_timeout)
+
+    with app.app_context():
+        push_device = PushDevice(
+            user_id=1,
+            platform="ios",
+            push_token="ExponentPushToken[timeout-token]",
+        )
+        push_device.id = 99
+
+        NotificationService().send_push(push_device, "Title", "Body")

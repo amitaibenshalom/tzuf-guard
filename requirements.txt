@@ -5,4 +5,5 @@ Flask-Migrate>=4.0.0
 Flask-SQLAlchemy>=3.1.0
 PyJWT>=2.8.0
 python-dotenv>=1.0.0
+requests>=2.31.0
 sqlalchemy-libsql>=0.2.0

@@ -123,4 +123,4 @@ The ESP32 uses only the per-door secret token when posting `/api/door-status`.
 - API responses never expose door tokens or password hashes.
 - Users can only access their own doors.
 - CORS is scoped to `/api/*`.
-- Push notification delivery is currently a service boundary with a mock logger; replace `NotificationService.send_push` with FCM when ready.
+- Push notification delivery sends Expo push notifications when `NOTIFICATIONS_ENABLED=true`.
