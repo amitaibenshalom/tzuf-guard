@@ -14,14 +14,8 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table("users") as batch_op:
-        batch_op.alter_column(
-            "password_hash",
-            existing_type=sa.String(length=255),
-            nullable=True,
-        )
-        batch_op.add_column(sa.Column("google_sub", sa.String(length=255), nullable=True))
-
+    op.execute("DROP TABLE IF EXISTS _alembic_tmp_users")
+    op.add_column("users", sa.Column("google_sub", sa.String(length=255), nullable=True))
     op.create_index(op.f("ix_users_google_sub"), "users", ["google_sub"], unique=True)
 
     op.create_table(
@@ -59,10 +53,4 @@ def downgrade():
     op.drop_table("password_reset_tokens")
 
     op.drop_index(op.f("ix_users_google_sub"), table_name="users")
-    with op.batch_alter_table("users") as batch_op:
-        batch_op.drop_column("google_sub")
-        batch_op.alter_column(
-            "password_hash",
-            existing_type=sa.String(length=255),
-            nullable=False,
-        )
+    op.drop_column("users", "google_sub")

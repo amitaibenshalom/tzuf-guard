@@ -99,6 +99,7 @@ def google_login():
                 name=name,
                 google_sub=google_sub,
             )
+            user.set_password(generate_secure_token())
             db.session.add(user)
 
     try:

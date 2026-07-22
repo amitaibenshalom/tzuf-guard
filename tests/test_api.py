@@ -96,12 +96,13 @@ def test_google_login_creates_user(client, app, monkeypatch):
     with app.app_context():
         user = User.query.filter_by(email="googleuser@example.com").one()
         assert user.google_sub == "google-sub-123"
-        assert user.password_hash is None
+        assert user.check_password("valid-google-token") is False
 
 
 def test_google_login_existing_linked_user(client, app, monkeypatch):
     with app.app_context():
         user = User(email="linked@example.com", name="Linked", google_sub="google-sub-123")
+        user.set_password("unusable-password")
         db.session.add(user)
         db.session.commit()
         user_id = user.id

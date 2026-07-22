@@ -22,7 +22,7 @@ class User(TimestampMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
-    password_hash = db.Column(db.String(255), nullable=True)
+    password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(120), nullable=True)
     google_sub = db.Column(db.String(255), nullable=True, unique=True, index=True)
 
@@ -38,8 +38,6 @@ class User(TimestampMixin, db.Model):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        if not self.password_hash:
-            return False
         return check_password_hash(self.password_hash, password)
 
 
