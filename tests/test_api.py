@@ -1,9 +1,12 @@
+from datetime import timedelta
+
 import pytest
 import requests
 
 from app import create_app
 from app.extensions import db
-from app.models import Door, DoorEvent, PushDevice
+from app.models import Door, DoorEvent, PasswordResetToken, PushDevice, User, utcnow
+from app.security import hash_reset_token
 from app.services.notifications import NotificationService
 
 from .conftest import auth_headers, login_user, register_user
@@ -66,6 +69,121 @@ def test_login_success_and_failure(client):
     assert failure.status_code == 401
 
 
+def test_google_login_creates_user(client, app, monkeypatch):
+    def fake_verify(raw_id_token, audiences):
+        assert raw_id_token == "valid-google-token"
+        assert set(audiences) == {
+            "62060365746-5lrgdhjnr57qg7pbumo4p3durcf9nbl1.apps.googleusercontent.com",
+            "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com",
+        }
+        return {
+            "sub": "google-sub-123",
+            "email": "GoogleUser@Example.com",
+            "email_verified": True,
+            "name": "Google User",
+        }
+
+    monkeypatch.setattr("app.routes.auth.verify_google_id_token", fake_verify)
+
+    response = client.post("/api/auth/google", json={"id_token": "valid-google-token"})
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["user"]["email"] == "googleuser@example.com"
+    assert body["user"]["name"] == "Google User"
+    assert "access_token" in body
+
+    with app.app_context():
+        user = User.query.filter_by(email="googleuser@example.com").one()
+        assert user.google_sub == "google-sub-123"
+        assert user.password_hash is None
+
+
+def test_google_login_existing_linked_user(client, app, monkeypatch):
+    with app.app_context():
+        user = User(email="linked@example.com", name="Linked", google_sub="google-sub-123")
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    monkeypatch.setattr(
+        "app.routes.auth.verify_google_id_token",
+        lambda raw_id_token, audiences: {
+            "sub": "google-sub-123",
+            "email": "linked@example.com",
+            "email_verified": True,
+            "name": "Changed Name",
+        },
+    )
+
+    response = client.post("/api/auth/google", json={"id_token": "valid-google-token"})
+
+    assert response.status_code == 200
+    assert response.get_json()["user"]["id"] == user_id
+
+    with app.app_context():
+        assert User.query.count() == 1
+
+
+def test_google_login_links_existing_email_user(client, app, monkeypatch):
+    register_user(client, email="linkme@example.com", name="Password User")
+    monkeypatch.setattr(
+        "app.routes.auth.verify_google_id_token",
+        lambda raw_id_token, audiences: {
+            "sub": "new-google-sub",
+            "email": "linkme@example.com",
+            "email_verified": True,
+            "name": "Google Name",
+        },
+    )
+
+    response = client.post("/api/auth/google", json={"id_token": "valid-google-token"})
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        user = User.query.filter_by(email="linkme@example.com").one()
+        assert user.google_sub == "new-google-sub"
+        assert user.check_password("password123") is True
+        assert user.name == "Password User"
+
+
+def test_google_login_invalid_token(client, monkeypatch):
+    def fake_verify(raw_id_token, audiences):
+        raise ValueError("bad token")
+
+    monkeypatch.setattr("app.routes.auth.verify_google_id_token", fake_verify)
+
+    response = client.post("/api/auth/google", json={"id_token": "bad-google-token"})
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "invalid_google_token"
+
+
+def test_google_login_rejects_unverified_email(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.routes.auth.verify_google_id_token",
+        lambda raw_id_token, audiences: {
+            "sub": "google-sub-123",
+            "email": "user@example.com",
+            "email_verified": False,
+            "name": "User",
+        },
+    )
+
+    response = client.post("/api/auth/google", json={"id_token": "valid-google-token"})
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "google_email_unverified"
+
+
+def test_google_login_requires_token(client):
+    response = client.post("/api/auth/google", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "missing_google_token"
+
+
 def test_current_user_endpoint(client):
     response = register_user(client, email="me@example.com")
     headers = auth_headers(response.get_json()["access_token"])
@@ -74,6 +192,114 @@ def test_current_user_endpoint(client):
 
     assert me.status_code == 200
     assert me.get_json()["user"]["email"] == "me@example.com"
+
+
+def test_forgot_password_always_returns_generic_message(client, monkeypatch):
+    sent = []
+
+    monkeypatch.setattr(
+        "app.routes.auth.email_service.send_password_reset",
+        lambda user, token: sent.append((user.email, token)),
+    )
+
+    missing = client.post(
+        "/api/auth/forgot-password",
+        json={"email": "missing@example.com"},
+    )
+    register_user(client, email="reset@example.com")
+    existing = client.post(
+        "/api/auth/forgot-password",
+        json={"email": "reset@example.com"},
+    )
+
+    expected = {"message": "If that email exists, reset instructions were sent."}
+    assert missing.status_code == 200
+    assert missing.get_json() == expected
+    assert existing.status_code == 200
+    assert existing.get_json() == expected
+    assert len(sent) == 1
+    assert sent[0][0] == "reset@example.com"
+
+
+def test_reset_password_works_with_valid_token(client, monkeypatch):
+    sent = []
+
+    monkeypatch.setattr(
+        "app.routes.auth.email_service.send_password_reset",
+        lambda user, token: sent.append(token),
+    )
+
+    register_user(client, email="resetworks@example.com", password="oldpassword123")
+    client.post(
+        "/api/auth/forgot-password",
+        json={"email": "resetworks@example.com"},
+    )
+
+    response = client.post(
+        "/api/auth/reset-password",
+        json={"token": sent[0], "password": "newpassword123"},
+    )
+    login = login_user(
+        client,
+        email="resetworks@example.com",
+        password="newpassword123",
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"message": "Password reset successfully."}
+    assert login.status_code == 200
+
+    with client.application.app_context():
+        token_hash = hash_reset_token(sent[0])
+        token_record = PasswordResetToken.query.filter_by(token_hash=token_hash).one()
+        assert token_record.used_at is not None
+
+
+def test_reset_password_rejects_used_token(client, monkeypatch):
+    sent = []
+
+    monkeypatch.setattr(
+        "app.routes.auth.email_service.send_password_reset",
+        lambda user, token: sent.append(token),
+    )
+
+    register_user(client, email="usedreset@example.com")
+    client.post("/api/auth/forgot-password", json={"email": "usedreset@example.com"})
+    client.post(
+        "/api/auth/reset-password",
+        json={"token": sent[0], "password": "newpassword123"},
+    )
+    response = client.post(
+        "/api/auth/reset-password",
+        json={"token": sent[0], "password": "anotherpassword123"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_reset_token"
+
+
+def test_reset_password_rejects_expired_token(client, app):
+    register_user(client, email="expiredreset@example.com")
+
+    with app.app_context():
+        user = User.query.filter_by(email="expiredreset@example.com").one()
+        token = "expired-reset-token"
+        db.session.add(
+            PasswordResetToken(
+                user_id=user.id,
+                token_hash=hash_reset_token(token),
+                expires_at=utcnow() - timedelta(minutes=1),
+            )
+        )
+        db.session.commit()
+
+    response = client.post(
+        "/api/auth/reset-password",
+        json={"token": token, "password": "newpassword123"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_reset_token"
 
 
 def test_create_door(client, auth):

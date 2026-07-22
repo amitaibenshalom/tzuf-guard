@@ -22,18 +22,24 @@ class User(TimestampMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)
     name = db.Column(db.String(120), nullable=True)
+    google_sub = db.Column(db.String(255), nullable=True, unique=True, index=True)
 
     doors = db.relationship("Door", back_populates="user", cascade="all, delete-orphan")
     push_devices = db.relationship(
         "PushDevice", back_populates="user", cascade="all, delete-orphan"
+    )
+    password_reset_tokens = db.relationship(
+        "PasswordResetToken", back_populates="user", cascade="all, delete-orphan"
     )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, password)
 
 
@@ -82,3 +88,16 @@ class PushDevice(TimestampMixin, db.Model):
     push_token = db.Column(db.String(512), nullable=False)
 
     user = db.relationship("User", back_populates="push_devices")
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = "password_reset_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="password_reset_tokens")

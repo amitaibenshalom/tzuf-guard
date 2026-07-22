@@ -34,9 +34,18 @@ JWT_SECRET_KEY=<different strong random secret, at least 32 chars>
 TURSO_DATABASE_URL=libsql://your-database-your-org.turso.io
 TURSO_AUTH_TOKEN=<your Turso auth token>
 CORS_ENABLED=true
-CORS_ORIGINS=https://amitaibenshalom.com
+CORS_ORIGINS=https://your-domain.example
 NOTIFICATIONS_ENABLED=true
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
+GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
+PASSWORD_RESET_BASE_URL=https://your-domain.example/reset-password
+PASSWORD_RESET_EXPIRES_MINUTES=60
+MAIL_FROM=no-reply@your-domain.example
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=<smtp login>
+SMTP_PASSWORD=<smtp key>
+SMTP_USE_TLS=true
 ```
 
 Production startup fails fast if Turso or secrets are missing.
@@ -90,6 +99,9 @@ Auth:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/google`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `GET /api/me`
 
 Doors:
