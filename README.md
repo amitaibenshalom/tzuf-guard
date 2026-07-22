@@ -107,6 +107,7 @@ Device:
 Push:
 
 - `POST /api/push-devices`
+- `DELETE /api/push-devices`
 
 Authenticated app endpoints require:
 

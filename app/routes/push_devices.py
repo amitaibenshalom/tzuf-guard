@@ -37,3 +37,40 @@ def register_push_device(current_user):
 
     db.session.commit()
     return jsonify({"push_device": push_device_to_dict(push_device)}), status_code
+
+
+@push_devices_bp.delete("")
+@current_user_required
+def delete_push_device(current_user):
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        raise ApiError("Request body must be a JSON object.", 400, "invalid_json")
+
+    push_token = string_field(
+        data,
+        "push_token",
+        required=False,
+        max_length=512,
+    )
+    if not push_token:
+        raise ApiError("push_token is required.", 400, "missing_push_token")
+
+    platform = string_field(
+        data,
+        "platform",
+        required=False,
+        max_length=32,
+    )
+    platform = (platform or "android").lower()
+
+    if platform not in VALID_PUSH_PLATFORMS:
+        raise ApiError("Unsupported push platform.", 400, "invalid_platform")
+
+    PushDevice.query.filter_by(
+        user_id=current_user.id,
+        platform=platform,
+        push_token=push_token,
+    ).delete()
+
+    db.session.commit()
+    return jsonify({"message": "Push device deleted."})

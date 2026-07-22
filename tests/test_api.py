@@ -234,6 +234,44 @@ def test_push_token_registration(client, auth, app):
         assert PushDevice.query.count() == 1
 
 
+def test_delete_push_device_by_token(client, auth, app):
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={"platform": "android", "push_token": "push-token-123"},
+    )
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={"platform": "ios", "push_token": "push-token-123"},
+    )
+
+    response = client.delete(
+        "/api/push-devices",
+        headers=auth,
+        json={"push_token": "push-token-123"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"message": "Push device deleted."}
+
+    with app.app_context():
+        remaining = PushDevice.query.one()
+        assert remaining.platform == "ios"
+        assert remaining.push_token == "push-token-123"
+
+
+def test_delete_push_device_requires_token(client, auth):
+    response = client.delete(
+        "/api/push-devices",
+        headers=auth,
+        json={},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "missing_push_token"
+
+
 def test_status_change_sends_expo_push(client, auth, monkeypatch):
     sent = []
 
@@ -273,8 +311,8 @@ def test_status_change_sends_expo_push(client, auth, monkeypatch):
     url, kwargs = sent[0]
     assert url == "https://exp.host/--/api/v2/push/send"
     assert kwargs["json"]["to"] == "ExponentPushToken[valid-token]"
-    assert kwargs["json"]["title"] == "Front Door opened"
-    assert kwargs["json"]["body"] == "Front Door is now opened."
+    assert kwargs["json"]["title"] == "🚨 Front Door opened!"
+    assert kwargs["json"]["body"] == "🚪 Someone opened Front Door."
     assert kwargs["json"]["data"] == {
         "door_id": str(response.get_json()["door"]["id"]),
         "status": "opened",
@@ -283,6 +321,90 @@ def test_status_change_sends_expo_push(client, auth, monkeypatch):
     assert kwargs["json"]["sound"] == "default"
     assert kwargs["json"]["priority"] == "high"
     assert kwargs["timeout"] == 10
+
+
+def test_status_change_closed_uses_safe_emoji(client, auth, monkeypatch):
+    sent = []
+
+    class StubResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"status": "ok", "id": "ticket-123"}}
+
+    monkeypatch.setattr(
+        "app.services.notifications.requests.post",
+        lambda url, **kwargs: sent.append((url, kwargs)) or StubResponse(),
+    )
+
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={
+            "platform": "ios",
+            "push_token": "ExponentPushToken[valid-token]",
+        },
+    )
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front Door", "token": "closed-emoji-token"},
+    )
+    client.post(
+        "/api/door-status",
+        json={"token": "closed-emoji-token", "status": "opened"},
+    )
+    response = client.post(
+        "/api/door-status",
+        json={"token": "closed-emoji-token", "status": "closed"},
+    )
+
+    assert response.status_code == 200
+    assert len(sent) == 2
+    assert sent[1][1]["json"]["title"] == "✅ Front Door closed"
+    assert sent[1][1]["json"]["body"] == "🔒 Front Door is now closed."
+
+
+def test_status_change_includes_location_when_present(client, auth, monkeypatch):
+    sent = []
+
+    class StubResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"status": "ok", "id": "ticket-123"}}
+
+    monkeypatch.setattr(
+        "app.services.notifications.requests.post",
+        lambda url, **kwargs: sent.append((url, kwargs)) or StubResponse(),
+    )
+
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={
+            "platform": "ios",
+            "push_token": "ExponentPushToken[valid-token]",
+        },
+    )
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={
+            "name": "Front Door",
+            "location": "the hallway",
+            "token": "location-emoji-token",
+        },
+    )
+    response = client.post(
+        "/api/door-status",
+        json={"token": "location-emoji-token", "status": "opened"},
+    )
+
+    assert response.status_code == 200
+    assert sent[0][1]["json"]["body"] == "🚪 Someone opened Front Door in the hallway."
 
 
 def test_notification_service_skips_invalid_expo_token(app, monkeypatch):

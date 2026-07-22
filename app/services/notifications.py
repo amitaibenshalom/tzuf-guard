@@ -17,8 +17,13 @@ class NotificationService:
             return
 
         devices = PushDevice.query.filter_by(user_id=door.user_id).all()
-        title = f"{door.name} {door.last_status}"
-        body = f"{door.name} is now {door.last_status}."
+        location = f" in {door.location}" if door.location else ""
+        if door.last_status == "opened":
+            title = f"🚨 {door.name} opened!"
+            body = f"🚪 Someone opened {door.name}{location}."
+        else:
+            title = f"✅ {door.name} closed"
+            body = f"🔒 {door.name}{location} is now closed."
 
         for device in devices:
             self.send_push(
