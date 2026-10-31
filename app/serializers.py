@@ -1,5 +1,15 @@
+from datetime import timezone
+
+
 def isoformat(value):
-    return value.isoformat() if value else None
+    if value is None:
+        return None
+    # SQLite-compatible drivers may return a naive value even for a timezone
+    # column. Stored application timestamps are UTC, so make that explicit for
+    # browsers before they convert to the viewer's local timezone.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
 
 
 def user_to_dict(user):
@@ -12,19 +22,20 @@ def user_to_dict(user):
     }
 
 
-def door_to_dict(door, include_events=False):
+def door_to_dict(door, include_events=False, events=None):
     data = {
         "id": door.id,
         "name": door.name,
         "location": door.location,
         "last_status": door.last_status,
         "last_seen_at": isoformat(door.last_seen_at),
-        "battery_mv": door.battery_mv,
         "device_name": door.device_name,
         "created_at": isoformat(door.created_at),
         "updated_at": isoformat(door.updated_at),
     }
-    if include_events:
+    if events is not None:
+        data["events"] = [door_event_to_dict(event) for event in events]
+    elif include_events:
         data["events"] = [door_event_to_dict(event) for event in door.events]
     return data
 
@@ -34,7 +45,6 @@ def door_event_to_dict(event):
         "id": event.id,
         "door_id": event.door_id,
         "status": event.status,
-        "battery_mv": event.battery_mv,
         "device_name": event.device_name,
         "received_at": isoformat(event.received_at),
     }

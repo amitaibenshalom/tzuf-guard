@@ -6,7 +6,7 @@ import requests
 from app import create_app
 from app.extensions import db
 from app.models import Door, DoorEvent, PasswordResetToken, PushDevice, User, utcnow
-from app.security import hash_reset_token
+from app.security import DOOR_TOKEN_WORDS, hash_reset_token
 from app.services.notifications import NotificationService
 
 from .conftest import auth_headers, login_user, register_user
@@ -27,6 +27,13 @@ def test_homepage(client):
 
     assert response.status_code == 200
     assert b"TzufGuard" in response.data
+    assert b"Know the moment a door changes" in response.data
+    assert b"Working on something new" not in response.data
+
+
+def test_frontend_assets(client):
+    assert client.get("/static/app.css").status_code == 200
+    assert client.get("/static/app.js").status_code == 200
 
 
 def test_health_and_cors(client):
@@ -56,6 +63,16 @@ def test_duplicate_user_email(client):
 
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "duplicate_email"
+
+
+def test_registration_requires_name(client):
+    response = client.post(
+        "/api/auth/register",
+        json={"email": "nameless@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "validation_error"
 
 
 def test_login_success_and_failure(client):
@@ -135,6 +152,7 @@ def test_google_login_links_existing_email_user(client, app, monkeypatch):
             "email": "linkme@example.com",
             "email_verified": True,
             "name": "Google Name",
+            "hd": "example.com",
         },
     )
 
@@ -147,6 +165,26 @@ def test_google_login_links_existing_email_user(client, app, monkeypatch):
         assert user.google_sub == "new-google-sub"
         assert user.check_password("password123") is True
         assert user.name == "Password User"
+
+
+def test_google_login_does_not_auto_link_non_authoritative_email(client, monkeypatch):
+    register_user(client, email="external@example.com", name="Password User")
+    monkeypatch.setattr(
+        "app.routes.auth.verify_google_id_token",
+        lambda raw_id_token, audiences: {
+            "sub": "external-google-sub",
+            "email": "external@example.com",
+            "email_verified": True,
+            "name": "Google User",
+        },
+    )
+
+    response = client.post(
+        "/api/auth/google", json={"id_token": "valid-google-token"}
+    )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "google_link_requires_password"
 
 
 def test_google_login_invalid_token(client, monkeypatch):
@@ -317,6 +355,35 @@ def test_create_door(client, auth):
     assert "token_hash" not in door
 
 
+def test_create_door_generates_one_time_word_phrase(client, auth):
+    response = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Kitchen Door", "location": "Kitchen"},
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    phrase = body["provisioning_token"]
+    words = phrase.split("-")
+    assert len(words) == 12
+    assert all(word in DOOR_TOKEN_WORDS for word in words)
+
+    listed = client.get("/api/doors", headers=auth).get_json()["doors"][0]
+    detailed = client.get(f"/api/doors/{body['door']['id']}", headers=auth).get_json()[
+        "door"
+    ]
+    assert "provisioning_token" not in listed
+    assert "provisioning_token" not in detailed
+    assert "token_hash" not in listed
+
+    report = client.post(
+        "/api/door-status",
+        json={"token": phrase, "status": "closed"},
+    )
+    assert report.status_code == 200
+
+
 def test_duplicate_door_token(client, auth):
     payload = {"name": "Front Door", "token": "shared-secret-token"}
     client.post("/api/doors", headers=auth, json=payload)
@@ -358,7 +425,6 @@ def test_esp32_status_update_success(client, auth):
         json={
             "token": "esp32-secret-token",
             "status": "opened",
-            "battery_mv": 3100,
             "device": "TzufGuard-ABC123",
         },
     )
@@ -368,6 +434,10 @@ def test_esp32_status_update_success(client, auth):
     assert body["door"]["last_status"] == "opened"
     assert body["event"]["status"] == "opened"
     assert body["status_changed"] is True
+    assert body["door"]["last_seen_at"].endswith("+00:00")
+    assert body["event"]["received_at"].endswith("+00:00")
+    assert "battery_mv" not in body["door"]
+    assert "battery_mv" not in body["event"]
 
 
 def test_unknown_device_token(client):
@@ -415,6 +485,65 @@ def test_event_history_creation(client, auth, app):
     with app.app_context():
         door = Door.query.one()
         assert DoorEvent.query.filter_by(door_id=door.id).count() == 2
+
+
+def test_unchanged_status_updates_last_seen_without_duplicate_event(client, auth, app):
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front Door", "token": "heartbeat-secret-token"},
+    )
+    first = client.post(
+        "/api/door-status",
+        json={"token": "heartbeat-secret-token", "status": "closed"},
+    )
+    second = client.post(
+        "/api/door-status",
+        json={"token": "heartbeat-secret-token", "status": "closed"},
+    )
+
+    assert first.get_json()["event"] is not None
+    assert second.get_json()["event"] is None
+    assert second.get_json()["status_changed"] is False
+    with app.app_context():
+        assert DoorEvent.query.count() == 1
+
+
+def test_door_edit_history_pagination_and_delete(client, auth):
+    created = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Old name", "token": "management-secret-token"},
+    ).get_json()["door"]
+    for status in ["closed", "opened", "closed"]:
+        client.post(
+            "/api/door-status",
+            json={"token": "management-secret-token", "status": status},
+        )
+
+    updated = client.patch(
+        f"/api/doors/{created['id']}",
+        headers=auth,
+        json={"name": "Back Door", "location": "Garden"},
+    )
+    history = client.get(
+        f"/api/doors/{created['id']}/events?page=1&per_page=2", headers=auth
+    )
+
+    assert updated.status_code == 200
+    assert updated.get_json()["door"]["name"] == "Back Door"
+    assert history.status_code == 200
+    assert len(history.get_json()["events"]) == 2
+    assert history.get_json()["pagination"] == {
+        "page": 1,
+        "per_page": 2,
+        "total": 3,
+        "has_more": True,
+    }
+
+    deleted = client.delete(f"/api/doors/{created['id']}", headers=auth)
+    assert deleted.status_code == 200
+    assert client.get(f"/api/doors/{created['id']}", headers=auth).status_code == 404
 
 
 def test_no_duplicate_push_notification_when_status_unchanged(

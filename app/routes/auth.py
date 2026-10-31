@@ -21,7 +21,7 @@ def register():
     data = require_json(request)
     email = normalize_email(string_field(data, "email", max_length=255))
     password = string_field(data, "password", min_length=8, max_length=128)
-    name = string_field(data, "name", required=False, max_length=120)
+    name = string_field(data, "name", max_length=120)
 
     user = User(email=email, name=name)
     user.set_password(password)
@@ -90,6 +90,12 @@ def google_login():
     if user is None:
         user = User.query.filter_by(email=email).first()
         if user is not None:
+            if not _google_is_authoritative_for_email(claims, email):
+                raise ApiError(
+                    "An account already exists for this email. Log in with your password.",
+                    409,
+                    "google_link_requires_password",
+                )
             user.google_sub = google_sub
             if not user.name and name:
                 user.name = name
@@ -110,6 +116,10 @@ def google_login():
 
     token = create_access_token(identity=str(user.id))
     return jsonify({"user": user_to_dict(user), "access_token": token})
+
+
+def _google_is_authoritative_for_email(claims, email):
+    return email.endswith("@gmail.com") or bool(claims.get("hd"))
 
 
 @auth_bp.post("/forgot-password")

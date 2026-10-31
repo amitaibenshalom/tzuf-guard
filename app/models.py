@@ -51,7 +51,6 @@ class Door(TimestampMixin, db.Model):
     token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
     last_status = db.Column(db.String(16), nullable=True)
     last_seen_at = db.Column(db.DateTime(timezone=True), nullable=True)
-    battery_mv = db.Column(db.Integer, nullable=True)
     device_name = db.Column(db.String(120), nullable=True)
 
     user = db.relationship("User", back_populates="doors")
@@ -69,7 +68,6 @@ class DoorEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     door_id = db.Column(db.Integer, db.ForeignKey("doors.id"), nullable=False, index=True)
     status = db.Column(db.String(16), nullable=False)
-    battery_mv = db.Column(db.Integer, nullable=True)
     device_name = db.Column(db.String(120), nullable=True)
     received_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 

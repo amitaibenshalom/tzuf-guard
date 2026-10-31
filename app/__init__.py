@@ -39,11 +39,24 @@ def register_routes(app):
 
     @app.get("/")
     def home():
-        return render_template("index.html")
+        return render_template(
+            "index.html",
+            google_client_id=app.config["GOOGLE_WEB_CLIENT_ID"],
+        )
 
     @app.get("/api/health")
     def health():
         return jsonify({"status": "ok"})
+
+    @app.after_request
+    def security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        return response
 
 
 def register_error_handlers(app):

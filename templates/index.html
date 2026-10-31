@@ -1,85 +1,95 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>TzufGuard</title>
-        <meta
-            name="description"
-            content="TzufGuard is getting ready to protect more doors."
-        />
-        <style>
-            :root {
-                --bg: #f7f3ea;
-                --ink: #202124;
-                --muted: #5f6368;
-                --accent: #1f7a6d;
-                --line: rgba(32, 33, 36, 0.14);
-            }
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Monitor and manage every TzufGuard door sensor in one place.">
+    <meta name="theme-color" content="#10231d">
+    <title>TzufGuard · Door monitoring</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body data-google-client-id="{{ google_client_id }}">
+    <svg class="svg-sprite" aria-hidden="true">
+        <symbol id="icon-logo" viewBox="0 0 32 32"><path d="M6 27V5.5A2.5 2.5 0 0 1 8.5 3h15A2.5 2.5 0 0 1 26 5.5V27M10 27V7h12v20M3 27h26M18.5 16h.01"/></symbol>
+        <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l3.5-.7L19 7.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z"/></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+        <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+        <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+        <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+        <symbol id="icon-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2m-5 1 2 2"/></symbol>
+        <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    </svg>
 
-            * {
-                box-sizing: border-box;
-            }
+    <div class="page-glow page-glow--one"></div><div class="page-glow page-glow--two"></div>
 
-            body {
-                margin: 0;
-                min-height: 100vh;
-                display: grid;
-                place-items: center;
-                padding: 32px;
-                color: var(--ink);
-                font-family:
-                    Inter, ui-sans-serif, system-ui, -apple-system,
-                    BlinkMacSystemFont, "Segoe UI", sans-serif;
-                background:
-                    radial-gradient(circle at 20% 20%, #ffffff 0, transparent 34%),
-                    linear-gradient(135deg, #f7f3ea 0%, #dcebe7 52%, #f4d9cf 100%);
-            }
+    <section id="auth-view" class="auth-shell">
+        <div class="brand-panel">
+            <a class="brand brand--light" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+            <div class="brand-copy">
+                <p class="eyebrow">Calm, connected, aware</p>
+                <h1>Know the moment a door changes.</h1>
+                <p>Set up your sensors, see every entrance at a glance, and keep a clear history of what happened.</p>
+            </div>
+            <div class="brand-status"><span class="pulse-dot"></span><span>Secure door monitoring</span></div>
+        </div>
 
-            main {
-                width: min(100%, 720px);
-                padding: clamp(32px, 8vw, 72px);
-                border: 1px solid var(--line);
-                border-radius: 8px;
-                background: rgba(255, 255, 255, 0.72);
-                box-shadow: 0 24px 80px rgba(32, 33, 36, 0.12);
-            }
+        <div class="auth-panel">
+            <div class="auth-card">
+                <div class="auth-heading"><p class="eyebrow">Welcome</p><h2 id="auth-title">Log in to your account</h2><p id="auth-subtitle">Your doors are waiting.</p></div>
+                <div class="auth-tabs" role="tablist">
+                    <button id="login-tab" class="auth-tab active" type="button" role="tab">Log in</button>
+                    <button id="register-tab" class="auth-tab" type="button" role="tab">Sign up</button>
+                </div>
+                <form id="login-form" class="stack-form">
+                    <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+                    <label>Password<input name="password" type="password" autocomplete="current-password" required placeholder="Your password"></label>
+                    <button class="text-button text-button--primary" type="submit">Log in</button>
+                    <button id="forgot-password-button" class="link-button" type="button">Forgot password?</button>
+                </form>
+                <form id="register-form" class="stack-form hidden">
+                    <label>Name<input name="name" autocomplete="name" maxlength="120" required placeholder="Your name"></label>
+                    <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+                    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required placeholder="At least 8 characters"></label>
+                    <button class="text-button text-button--primary" type="submit">Create account</button>
+                </form>
+                <div class="divider"><span>or continue with</span></div>
+                <div id="google-button" class="google-button"></div>
+                <p id="auth-error" class="form-error" role="alert"></p>
+            </div>
+        </div>
+    </section>
 
-            .eyebrow {
-                margin: 0 0 18px;
-                color: var(--accent);
-                font-size: 0.86rem;
-                font-weight: 700;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-            }
-
-            h1 {
-                margin: 0;
-                max-width: 12ch;
-                font-size: clamp(2.7rem, 8vw, 5.8rem);
-                line-height: 0.94;
-                font-weight: 800;
-            }
-
-            p {
-                margin: 28px 0 0;
-                max-width: 58ch;
-                color: var(--muted);
-                font-size: clamp(1.05rem, 2vw, 1.25rem);
-                line-height: 1.6;
-            }
-        </style>
-    </head>
-    <body>
-        <main>
-            <p class="eyebrow">TzufGuard</p>
-            <h1>Working on something new.</h1>
-            <p>
-                The smart-door platform is being rebuilt for more homes, more
-                doors, and a cleaner app experience. The API is already quietly
-                waiting under <strong>/api</strong>.
-            </p>
+    <section id="dashboard-view" class="dashboard hidden">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+            <div class="topbar-user"><span id="user-greeting"></span><button id="logout-button" class="text-button text-button--quiet" type="button">Log out</button></div>
+        </header>
+        <main class="dashboard-main">
+            <div class="dashboard-heading">
+                <div><p class="eyebrow">Overview</p><h1>Your doors</h1><p>Live status and activity from every connected entrance.</p></div>
+                <button id="add-door-button" class="icon-button icon-button--add" type="button" aria-label="Add a door" title="Add a door"><svg><use href="#icon-plus"/></svg></button>
+            </div>
+            <div id="summary" class="summary-grid" aria-live="polite"></div>
+            <div id="door-loading" class="door-grid" aria-label="Loading doors"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+            <div id="door-grid" class="door-grid hidden"></div>
+            <div id="empty-state" class="empty-state hidden"><div class="empty-icon"><svg><use href="#icon-logo"/></svg></div><h2>No doors yet</h2><p>Add your first door to generate its one-time sensor setup phrase.</p><button class="text-button text-button--primary" data-action="add-door" type="button">Add your first door</button></div>
         </main>
-    </body>
+    </section>
+
+    <dialog id="door-form-dialog" class="modal"><form id="door-form" class="modal-card"><div class="modal-head"><div><p class="eyebrow" id="door-form-eyebrow">New monitor</p><h2 id="door-form-title">Add a door</h2></div><button class="icon-button" data-close type="button" aria-label="Close"><svg><use href="#icon-close"/></svg></button></div><input name="door_id" type="hidden"><label>Door name<input name="name" maxlength="120" required placeholder="Front door"></label><label>Location <span class="optional">Optional</span><input name="location" maxlength="120" placeholder="Ground floor"></label><p class="form-error" data-form-error></p><button class="text-button text-button--primary" type="submit">Save door</button></form></dialog>
+
+    <dialog id="token-dialog" class="modal modal--narrow"><div class="modal-card"><div class="success-mark"><svg><use href="#icon-key"/></svg></div><p class="eyebrow">Door created</p><h2>Save this setup phrase</h2><p>Enter it on the sensor's local setup page. For security, it will not appear again after you close this window.</p><div class="token-box"><code id="provisioning-token"></code><button id="copy-token-button" class="icon-button" type="button" aria-label="Copy setup phrase"><svg><use href="#icon-copy"/></svg></button></div><div class="warning-note"><strong>Copy it now.</strong> If it is lost, you will need to generate a new phrase.</div><button id="token-done-button" class="text-button text-button--primary" type="button">I saved it</button></div></dialog>
+
+    <dialog id="door-detail-dialog" class="modal modal--wide"><div class="modal-card"><div class="modal-head"><div><p class="eyebrow">Door details</p><h2 id="detail-name"></h2><p id="detail-location" class="detail-location"></p></div><div class="modal-actions"><button id="detail-edit" class="icon-button" type="button" aria-label="Edit door" title="Edit"><svg><use href="#icon-edit"/></svg></button><button id="detail-delete" class="icon-button icon-button--danger" type="button" aria-label="Delete door" title="Delete"><svg><use href="#icon-trash"/></svg></button><button class="icon-button" data-close type="button" aria-label="Close"><svg><use href="#icon-close"/></svg></button></div></div><div id="detail-status" class="detail-status"></div><div class="history-head"><div><h3>Activity history</h3><p>Recorded door state changes, newest first.</p></div><button id="regenerate-token" class="icon-button" type="button" aria-label="Generate a new setup phrase" title="New setup phrase"><svg><use href="#icon-key"/></svg></button></div><div id="history-list" class="history-list"></div><button id="load-more-events" class="text-button text-button--quiet hidden" type="button">Load more</button></div></dialog>
+
+    <dialog id="confirm-dialog" class="modal modal--narrow"><div class="modal-card"><p class="eyebrow">Please confirm</p><h2>Delete this door?</h2><p>Its status and complete activity history will be permanently removed.</p><div class="button-row"><button class="text-button text-button--quiet" data-close type="button">Cancel</button><button id="confirm-delete-button" class="text-button text-button--danger" type="button">Delete door</button></div></div></dialog>
+    <dialog id="forgot-dialog" class="modal modal--narrow"><form id="forgot-form" class="modal-card"><div class="modal-head"><div><p class="eyebrow">Account recovery</p><h2>Reset your password</h2></div><button class="icon-button" data-close type="button" aria-label="Close"><svg><use href="#icon-close"/></svg></button></div><p>Enter your email and we will send reset instructions if an account exists.</p><label>Email<input name="email" type="email" autocomplete="email" required></label><p class="form-error" data-form-error></p><button class="text-button text-button--primary" type="submit">Send reset link</button></form></dialog>
+    <dialog id="reset-dialog" class="modal modal--narrow"><form id="reset-form" class="modal-card"><p class="eyebrow">Choose a new password</p><h2>Reset password</h2><label>New password<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><p class="form-error" data-form-error></p><button class="text-button text-button--primary" type="submit">Save new password</button></form></dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
 </html>

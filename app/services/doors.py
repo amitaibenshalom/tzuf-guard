@@ -25,7 +25,7 @@ def create_door_for_user(user, name, token, location=None):
     return door
 
 
-def update_door_status(token, status, battery_mv=None, device_name=None):
+def update_door_status(token, status, device_name=None):
     door = Door.query.filter_by(token_hash=hash_door_token(token)).first()
     if door is None:
         raise ApiError("Unknown door token.", 404, "unknown_door_token")
@@ -36,17 +36,17 @@ def update_door_status(token, status, battery_mv=None, device_name=None):
 
     door.last_status = status
     door.last_seen_at = received_at
-    door.battery_mv = battery_mv
     door.device_name = device_name
 
-    event = DoorEvent(
-        door=door,
-        status=status,
-        battery_mv=battery_mv,
-        device_name=device_name,
-        received_at=received_at,
-    )
-    db.session.add(event)
+    event = None
+    if status_changed:
+        event = DoorEvent(
+            door=door,
+            status=status,
+            device_name=device_name,
+            received_at=received_at,
+        )
+        db.session.add(event)
     db.session.commit()
 
     if status_changed:

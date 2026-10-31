@@ -1,21 +1,26 @@
-# TzufGuard API
+# TzufGuard
 
-Clean Flask backend for the TzufGuard smart-door product. This directory is intended to be copied into its own repository and deployed directly to Vercel.
+TzufGuard is a web platform and Flask API for managing Wi-Fi door sensors. It is
+deployed to Vercel and stores production data in Turso/libSQL.
 
 It serves:
 
-- `/` as a simple public homepage.
-- `/api/...` as the mobile app and ESP32 REST API.
+- `/` as the responsive account and door-management dashboard.
+- `/api/...` as the browser, mobile client, and sensor REST API.
 - Turso/libSQL as the only production database.
+
+Users can register with name, email, and password or sign in with Google. The
+dashboard supports multiple doors, one-time sensor setup phrases, live status,
+editing, deletion, and paginated state-change history.
 
 ## Structure
 
 ```text
 tzuf-guard/
 ├── api/index.py          # Vercel Python entrypoint
-├── app/                  # Flask app package
+├── app/                  # Flask package, API, services, and static web assets
 ├── migrations/           # Alembic migrations
-├── templates/            # public homepage
+├── templates/            # web application shell
 ├── tests/                # focused API tests
 ├── requirements.txt      # production dependencies
 ├── requirements-dev.txt  # test/dev dependencies
@@ -38,6 +43,7 @@ CORS_ORIGINS=https://your-domain.example
 NOTIFICATIONS_ENABLED=true
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
+GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 PASSWORD_RESET_BASE_URL=https://your-domain.example/reset-password
 PASSWORD_RESET_EXPIRES_MINUTES=60
 MAIL_FROM=no-reply@your-domain.example
@@ -49,6 +55,10 @@ SMTP_USE_TLS=true
 ```
 
 Production startup fails fast if Turso or secrets are missing.
+
+For Google login, add `https://amitaibenshalom.com` as an authorized JavaScript
+origin for the web OAuth client in Google Cloud. Use the same web client ID in
+both `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_IDS`.
 
 ## Install Locally
 
@@ -106,11 +116,13 @@ Auth:
 
 Doors:
 
-- `POST /api/doors`
+- `POST /api/doors` — creates a door and returns its setup phrase once
 - `GET /api/doors`
 - `GET /api/doors/<id>`
+- `GET /api/doors/<id>/events`
 - `PATCH /api/doors/<id>`
 - `DELETE /api/doors/<id>`
+- `POST /api/doors/<id>/setup-token` — replaces and returns the setup phrase
 
 Device:
 
@@ -127,13 +139,19 @@ Authenticated app endpoints require:
 Authorization: Bearer <access_token>
 ```
 
-The ESP32 uses only the per-door secret token when posting `/api/door-status`.
+The sensor uses only the per-door setup phrase when posting `/api/door-status`.
+Every report refreshes the door's current status and last-seen time. History is
+created only when the status changes, so reconnects and repeated reports do not
+pollute the activity timeline.
 
 ## Security Notes
 
 - Passwords are hashed.
-- Door tokens are SHA-256 hashed before storage.
-- API responses never expose door tokens or password hashes.
+- Door setup phrases contain 84 bits of entropy and are SHA-256 hashed before
+  storage.
+- A setup phrase appears only in the create/regenerate response. It cannot be
+  retrieved later because only its hash is stored.
+- API responses never expose stored token hashes or password hashes.
 - Users can only access their own doors.
 - CORS is scoped to `/api/*`.
 - Push notification delivery sends Expo push notifications when `NOTIFICATIONS_ENABLED=true`.

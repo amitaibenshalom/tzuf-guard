@@ -14,6 +14,9 @@ DEFAULT_GOOGLE_OAUTH_CLIENT_IDS = ",".join(
         "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com",
     ]
 )
+DEFAULT_GOOGLE_WEB_CLIENT_ID = (
+    "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com"
+)
 
 
 def bool_from_env(name, default=False):
@@ -65,6 +68,9 @@ class Config:
         ).split(",")
         if client_id.strip()
     ]
+    GOOGLE_WEB_CLIENT_ID = os.getenv(
+        "GOOGLE_WEB_CLIENT_ID", DEFAULT_GOOGLE_WEB_CLIENT_ID
+    ).strip()
     PASSWORD_RESET_BASE_URL = os.getenv(
         "PASSWORD_RESET_BASE_URL", "https://amitaibenshalom.com/reset-password"
     ).strip()
@@ -110,6 +116,7 @@ class TestingConfig(Config):
         "62060365746-5lrgdhjnr57qg7pbumo4p3durcf9nbl1.apps.googleusercontent.com",
         "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com",
     ]
+    GOOGLE_WEB_CLIENT_ID = DEFAULT_GOOGLE_WEB_CLIENT_ID
     PASSWORD_RESET_BASE_URL = "https://amitaibenshalom.com/reset-password"
     PASSWORD_RESET_EXPIRES_MINUTES = 60
     MAIL_FROM = "no-reply@example.com"
