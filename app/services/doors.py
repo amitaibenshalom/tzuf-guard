@@ -40,6 +40,7 @@ def update_door_status(token, status, device_name=None):
 
     event = None
     if status_changed:
+        door.status_changed_at = received_at
         event = DoorEvent(
             door=door,
             status=status,

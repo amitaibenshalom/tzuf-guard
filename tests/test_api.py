@@ -239,6 +239,7 @@ def test_public_demo_is_safe_when_unconfigured(client):
     assert response.status_code == 200
     assert response.get_json() == {
         "available": False,
+        "duration_seconds": None,
         "label": "Amitai's door",
         "status": None,
     }
@@ -267,11 +268,11 @@ def test_public_demo_exposes_only_configured_label_and_status(client, auth, app)
     response = client.get("/api/public/demo-door")
 
     assert response.status_code == 200
-    assert response.get_json() == {
-        "available": True,
-        "label": "Amitai's door",
-        "status": "opened",
-    }
+    payload = response.get_json()
+    assert payload["available"] is True
+    assert payload["label"] == "Amitai's door"
+    assert payload["status"] == "opened"
+    assert 0 <= payload["duration_seconds"] <= 5
     body = response.get_data(as_text=True)
     assert "Private bedroom" not in body
     assert "Home" not in body
@@ -481,6 +482,7 @@ def test_esp32_status_update_success(client, auth):
     assert body["event"]["status"] == "opened"
     assert body["status_changed"] is True
     assert body["door"]["last_seen_at"].endswith("+00:00")
+    assert body["door"]["status_changed_at"] == body["event"]["received_at"]
     assert body["event"]["received_at"].endswith("+00:00")
     assert "battery_mv" not in body["door"]
     assert "battery_mv" not in body["event"]
@@ -551,6 +553,10 @@ def test_unchanged_status_updates_last_seen_without_duplicate_event(client, auth
     assert first.get_json()["event"] is not None
     assert second.get_json()["event"] is None
     assert second.get_json()["status_changed"] is False
+    assert (
+        second.get_json()["door"]["status_changed_at"]
+        == first.get_json()["door"]["status_changed_at"]
+    )
     with app.app_context():
         assert DoorEvent.query.count() == 1
 

@@ -50,6 +50,7 @@ class Door(TimestampMixin, db.Model):
     location = db.Column(db.String(120), nullable=True)
     token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
     last_status = db.Column(db.String(16), nullable=True)
+    status_changed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_seen_at = db.Column(db.DateTime(timezone=True), nullable=True)
     device_name = db.Column(db.String(120), nullable=True)
 

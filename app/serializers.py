@@ -28,6 +28,7 @@ def door_to_dict(door, include_events=False, events=None):
         "name": door.name,
         "location": door.location,
         "last_status": door.last_status,
+        "status_changed_at": isoformat(door.status_changed_at),
         "last_seen_at": isoformat(door.last_seen_at),
         "device_name": door.device_name,
         "created_at": isoformat(door.created_at),

@@ -162,28 +162,80 @@ function statusMeta(status) {
     return { label: "Not connected", className: "status--unknown" };
 }
 
+function formatElapsed(totalSeconds) {
+    const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const clock = [hours, minutes, seconds].map(value => String(value).padStart(2, "0")).join(":");
+    return days ? `${days}d ${clock}` : clock;
+}
+
+function durationText(status, startedAt) {
+    const started = new Date(startedAt).getTime();
+    if (!Number.isFinite(started)) return "Duration starts with the next change";
+    return `${statusMeta(status).label} for ${formatElapsed((Date.now() - started) / 1000)}`;
+}
+
+function setDurationCounter(element, status, startedAt) {
+    if (!element) return;
+    if (!startedAt || !["opened", "closed"].includes(status)) {
+        delete element.dataset.durationStatus;
+        delete element.dataset.durationStartedAt;
+        element.textContent = status ? "Duration starts with the next change" : "Waiting for the first sensor report";
+        return;
+    }
+    element.dataset.durationStatus = status;
+    element.dataset.durationStartedAt = startedAt;
+    element.textContent = durationText(status, startedAt);
+}
+
+function updateDurationCounters() {
+    $$('[data-duration-started-at]').forEach(element => {
+        element.textContent = durationText(element.dataset.durationStatus, element.dataset.durationStartedAt);
+    });
+}
+
+function durationMarkup(door) {
+    if (!["opened", "closed"].includes(door.last_status)) return "";
+    if (!door.status_changed_at) return '<span class="state-duration">Duration starts with the next change</span>';
+    return `<span class="state-duration" data-duration-status="${door.last_status}" data-duration-started-at="${escapeHtml(door.status_changed_at)}">${escapeHtml(durationText(door.last_status, door.status_changed_at))}</span>`;
+}
+
 function renderPublicDemo(payload) {
     const available = payload?.available === true;
     const status = available ? payload.status : null;
+    const detail = $("#demo-door-detail");
     publicDemo.classList.remove("is-loading", "is-open", "is-closed", "is-unavailable");
     $("#demo-door-label").textContent = payload?.label || "Amitai's door";
 
     if (status === "opened") {
         publicDemo.classList.add("is-open");
         $("#demo-door-status").textContent = "Open";
-        $("#demo-door-detail").textContent = "The sensor reports that the door is open";
+        const duration = payload.duration_seconds;
+        const startedAt = duration !== null && duration !== undefined && Number.isFinite(Number(duration))
+            ? new Date(Date.now() - Math.max(0, Number(duration)) * 1000).toISOString()
+            : null;
+        setDurationCounter(detail, status, startedAt);
         return;
     }
     if (status === "closed") {
         publicDemo.classList.add("is-closed");
         $("#demo-door-status").textContent = "Closed";
-        $("#demo-door-detail").textContent = "The sensor reports that the door is closed";
+        const duration = payload.duration_seconds;
+        const startedAt = duration !== null && duration !== undefined && Number.isFinite(Number(duration))
+            ? new Date(Date.now() - Math.max(0, Number(duration)) * 1000).toISOString()
+            : null;
+        setDurationCounter(detail, status, startedAt);
         return;
     }
 
     publicDemo.classList.add("is-unavailable");
     $("#demo-door-status").textContent = available ? "Waiting" : "Coming online";
-    $("#demo-door-detail").textContent = available
+    delete detail.dataset.durationStatus;
+    delete detail.dataset.durationStartedAt;
+    detail.textContent = available
         ? "Waiting for the sensor's first report"
         : "The live sensor demo is being configured";
 }
@@ -260,7 +312,7 @@ function renderDoors() {
         const location = door.location ? `${icon("pin")}${escapeHtml(door.location)}` : "No location set";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
-                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span></div>
+                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}</div>
                 <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location}</p>
                 <p class="door-seen">${icon("clock")}<span>${escapeHtml(relativeTime(door.last_seen_at))}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
@@ -271,6 +323,7 @@ function renderDoors() {
             </div>
         </article>`;
     }).join("");
+    updateDurationCounters();
 }
 
 function findDoor(id) {
@@ -340,7 +393,8 @@ async function openDoorDetail(door) {
 
 function renderDetailStatus(door) {
     const status = statusMeta(door.last_status);
-    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span><p>Last report: ${escapeHtml(formatDate(door.last_seen_at))}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>Last report: ${escapeHtml(formatDate(door.last_seen_at))}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    updateDurationCounters();
 }
 
 function renderHistory() {
@@ -529,3 +583,4 @@ setInterval(() => {
 setInterval(() => {
     if (!authView.classList.contains("hidden")) loadPublicDemo();
 }, 10000);
+setInterval(updateDurationCounters, 1000);
