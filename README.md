@@ -44,6 +44,8 @@ NOTIFICATIONS_ENABLED=true
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+PUBLIC_DEMO_DOOR_ID=<door database id shown by the doors API>
+PUBLIC_DEMO_DOOR_LABEL=Amitai's door
 PASSWORD_RESET_BASE_URL=https://your-domain.example/reset-password
 PASSWORD_RESET_EXPIRES_MINUTES=60
 MAIL_FROM=no-reply@your-domain.example
@@ -53,6 +55,11 @@ SMTP_USERNAME=<smtp login>
 SMTP_PASSWORD=<smtp key>
 SMTP_USE_TLS=true
 ```
+
+`PUBLIC_DEMO_DOOR_ID` selects the single door shown in the large live demo on
+the logged-out homepage. The public endpoint exposes only the configured label
+and the current `opened`/`closed` state. It never exposes the door's owner,
+location, device name, setup phrase, timestamps, or history.
 
 Production startup fails fast if Turso or secrets are missing.
 

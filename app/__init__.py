@@ -9,6 +9,7 @@ from .routes.device_status import device_status_bp
 from .routes.doors import doors_bp
 from .routes.me import me_bp
 from .routes.push_devices import push_devices_bp
+from .routes.public_demo import public_demo_bp
 
 
 def create_app(config_name=None):
@@ -43,6 +44,7 @@ def register_routes(app):
     app.register_blueprint(doors_bp, url_prefix="/api/doors")
     app.register_blueprint(device_status_bp, url_prefix="/api")
     app.register_blueprint(push_devices_bp, url_prefix="/api/push-devices")
+    app.register_blueprint(public_demo_bp, url_prefix="/api/public")
 
     @app.get("/")
     def home():

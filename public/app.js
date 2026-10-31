@@ -24,6 +24,7 @@ const doorForm = $("#door-form");
 const tokenDialog = $("#token-dialog");
 const detailDialog = $("#door-detail-dialog");
 const confirmDialog = $("#confirm-dialog");
+const publicDemo = $("#public-demo");
 
 function icon(name) {
     return `<svg aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
@@ -159,6 +160,42 @@ function statusMeta(status) {
     if (status === "opened") return { label: "Open", className: "status--opened" };
     if (status === "closed") return { label: "Closed", className: "status--closed" };
     return { label: "Not connected", className: "status--unknown" };
+}
+
+function renderPublicDemo(payload) {
+    const available = payload?.available === true;
+    const status = available ? payload.status : null;
+    publicDemo.classList.remove("is-loading", "is-open", "is-closed", "is-unavailable");
+    $("#demo-door-label").textContent = payload?.label || "Amitai's door";
+
+    if (status === "opened") {
+        publicDemo.classList.add("is-open");
+        $("#demo-door-status").textContent = "Open";
+        $("#demo-door-detail").textContent = "The sensor reports that the door is open";
+        return;
+    }
+    if (status === "closed") {
+        publicDemo.classList.add("is-closed");
+        $("#demo-door-status").textContent = "Closed";
+        $("#demo-door-detail").textContent = "The sensor reports that the door is closed";
+        return;
+    }
+
+    publicDemo.classList.add("is-unavailable");
+    $("#demo-door-status").textContent = available ? "Waiting" : "Coming online";
+    $("#demo-door-detail").textContent = available
+        ? "Waiting for the sensor's first report"
+        : "The live sensor demo is being configured";
+}
+
+async function loadPublicDemo() {
+    try {
+        const response = await fetch("/api/public/demo-door", { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error("Demo request failed");
+        renderPublicDemo(await response.json());
+    } catch {
+        renderPublicDemo({ available: false });
+    }
 }
 
 function formatDate(value) {
@@ -473,6 +510,7 @@ function bindEvents() {
 async function initialize() {
     bindEvents();
     initGoogle();
+    loadPublicDemo();
     if (new URLSearchParams(location.search).get("token")) openDialog($("#reset-dialog"));
     if (!state.token) return;
     try {
@@ -488,3 +526,6 @@ initialize();
 setInterval(() => {
     if (state.token && !dashboardView.classList.contains("hidden")) loadDoors(true);
 }, 30000);
+setInterval(() => {
+    if (!authView.classList.contains("hidden")) loadPublicDemo();
+}, 10000);

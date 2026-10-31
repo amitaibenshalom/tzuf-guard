@@ -233,6 +233,52 @@ def test_current_user_endpoint(client):
     assert me.get_json()["user"]["email"] == "me@example.com"
 
 
+def test_public_demo_is_safe_when_unconfigured(client):
+    response = client.get("/api/public/demo-door")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "available": False,
+        "label": "Amitai's door",
+        "status": None,
+    }
+    assert response.headers["Cache-Control"] == (
+        "public, max-age=0, s-maxage=5, stale-while-revalidate=10"
+    )
+
+
+def test_public_demo_exposes_only_configured_label_and_status(client, auth, app):
+    created = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Private bedroom", "location": "Home", "token": "demo-door-secret-token"},
+    ).get_json()["door"]
+    client.post(
+        "/api/door-status",
+        json={
+            "token": "demo-door-secret-token",
+            "status": "opened",
+            "device": "TzufGuard-PRIVATE",
+        },
+    )
+    app.config["PUBLIC_DEMO_DOOR_ID"] = str(created["id"])
+    app.config["PUBLIC_DEMO_DOOR_LABEL"] = "Amitai's door"
+
+    response = client.get("/api/public/demo-door")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "available": True,
+        "label": "Amitai's door",
+        "status": "opened",
+    }
+    body = response.get_data(as_text=True)
+    assert "Private bedroom" not in body
+    assert "Home" not in body
+    assert "TzufGuard-PRIVATE" not in body
+    assert "demo-door-secret-token" not in body
+
+
 def test_forgot_password_always_returns_generic_message(client, monkeypatch):
     sent = []
 

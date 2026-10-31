@@ -61,6 +61,10 @@ class Config:
         ]
 
     NOTIFICATIONS_ENABLED = bool_from_env("NOTIFICATIONS_ENABLED", default=True)
+    PUBLIC_DEMO_DOOR_ID = os.getenv("PUBLIC_DEMO_DOOR_ID", "").strip()
+    PUBLIC_DEMO_DOOR_LABEL = os.getenv(
+        "PUBLIC_DEMO_DOOR_LABEL", "Amitai's door"
+    ).strip()
     GOOGLE_OAUTH_CLIENT_IDS = [
         client_id.strip()
         for client_id in os.getenv(
@@ -112,6 +116,8 @@ class TestingConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {}
     CORS_ORIGINS = "*"
     NOTIFICATIONS_ENABLED = True
+    PUBLIC_DEMO_DOOR_ID = ""
+    PUBLIC_DEMO_DOOR_LABEL = "Amitai's door"
     GOOGLE_OAUTH_CLIENT_IDS = [
         "62060365746-5lrgdhjnr57qg7pbumo4p3durcf9nbl1.apps.googleusercontent.com",
         "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com",

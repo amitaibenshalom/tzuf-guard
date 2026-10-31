@@ -57,7 +57,25 @@ svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-
 .brand-copy { max-width: 590px; margin-block: 70px; }
 .brand-copy .eyebrow { color: var(--mint); }
 .brand-copy h1 { margin: 0; max-width: 10ch; font-size: clamp(3rem, 6vw, 6.5rem); font-weight: 760; line-height: .95; letter-spacing: -.065em; }
-.brand-copy > p:last-child { max-width: 44ch; margin: 28px 0 0; color: rgba(255,255,255,.7); font-size: clamp(1rem, 1.5vw, 1.2rem); line-height: 1.7; }
+.brand-intro { max-width: 44ch; margin: 28px 0 0; color: rgba(255,255,255,.7); font-size: clamp(1rem, 1.5vw, 1.2rem); line-height: 1.7; }
+.live-demo { --demo-accent: rgba(255,255,255,.76); width: min(100%, 560px); margin-top: 38px; padding: 21px; border: 1px solid rgba(255,255,255,.18); border-radius: 24px; background: rgba(5,30,23,.36); box-shadow: 0 24px 70px rgba(0,0,0,.18); backdrop-filter: blur(18px); transition: border-color .3s, background .3s, transform .3s; }
+.live-demo.is-open { --demo-accent: #ff8b79; border-color: rgba(255,139,121,.42); background: rgba(72,29,24,.38); }
+.live-demo.is-closed { --demo-accent: var(--mint); border-color: rgba(201,243,106,.38); }
+.live-demo__top, .live-demo__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: rgba(255,255,255,.58); font-size: .68rem; font-weight: 760; letter-spacing: .11em; text-transform: uppercase; }
+.live-demo__top > span:first-child { color: #fff; }
+.live-demo__signal { display: inline-flex; align-items: center; gap: 7px; }
+.live-demo__signal i { width: 8px; height: 8px; border-radius: 50%; background: var(--demo-accent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--demo-accent) 15%, transparent); }
+.live-demo.is-loading .live-demo__signal i { animation: demo-pulse 1.2s infinite; }
+.live-demo__body { display: flex; align-items: center; gap: 21px; padding: 24px 0 22px; }
+.live-demo__door { width: 92px; height: 92px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 27px; color: #102f27; background: var(--demo-accent); box-shadow: 0 16px 34px rgba(0,0,0,.2); transition: background .3s, transform .3s; }
+.live-demo.is-open .live-demo__door { transform: rotateY(-12deg) translateX(-2px); }
+.live-demo__door svg { width: 52px; height: 52px; stroke-width: 1.75; }
+.live-demo__copy { min-width: 0; }
+.live-demo__copy p { margin: 0 0 4px; color: rgba(255,255,255,.68); font-size: .88rem; font-weight: 700; }
+.live-demo__copy strong { display: block; color: #fff; font-size: clamp(2.25rem, 4.2vw, 3.5rem); line-height: 1; letter-spacing: -.055em; }
+.live-demo__copy > span { display: block; margin-top: 8px; color: var(--demo-accent); font-size: .8rem; font-weight: 720; }
+.live-demo__footer { padding-top: 15px; border-top: 1px solid rgba(255,255,255,.12); letter-spacing: .04em; text-transform: none; }
+@keyframes demo-pulse { 50% { opacity: .35; transform: scale(.8); } }
 .brand-status { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.72); font-size: .9rem; }
 .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 7px rgba(201,243,106,.12); }
 .auth-panel { display: grid; place-items: center; padding: 40px; }
@@ -172,14 +190,20 @@ input::placeholder { color: #9aa49f; }
 
 @media (max-width: 900px) {
     .auth-shell { grid-template-columns: 1fr; }
-    .brand-panel { min-height: 360px; padding: 32px; }
+    .brand-panel { min-height: 0; padding: 32px; }
     .brand-copy { margin: 58px 0 30px; }
     .brand-copy h1 { font-size: clamp(2.8rem, 12vw, 5rem); }
+    .live-demo { max-width: 620px; }
     .brand-status { display: none; }
     .auth-panel { padding: 48px 24px 70px; }
     .door-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
+    .live-demo { padding: 18px; border-radius: 21px; }
+    .live-demo__body { gap: 16px; }
+    .live-demo__door { width: 76px; height: 76px; border-radius: 22px; }
+    .live-demo__door svg { width: 43px; height: 43px; }
+    .live-demo__footer { align-items: flex-start; flex-direction: column; gap: 5px; }
     .topbar { height: 68px; padding: 0 18px; }
     .topbar-user span { display: none; }
     .dashboard-main { width: min(100% - 30px, 1240px); padding-top: 42px; }

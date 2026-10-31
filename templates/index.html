@@ -32,7 +32,19 @@
             <div class="brand-copy">
                 <p class="eyebrow">Calm, connected, aware</p>
                 <h1>Know the moment a door changes.</h1>
-                <p>Set up your sensors, see every entrance at a glance, and keep a clear history of what happened.</p>
+                <p class="brand-intro">Set up your sensors, see every entrance at a glance, and keep a clear history of what happened.</p>
+                <aside id="public-demo" class="live-demo is-loading" aria-label="Live door sensor demonstration" aria-live="polite">
+                    <div class="live-demo__top"><span>Live demo</span><span class="live-demo__signal"><i></i>Real sensor</span></div>
+                    <div class="live-demo__body">
+                        <div class="live-demo__door" aria-hidden="true"><svg><use href="#icon-logo"/></svg></div>
+                        <div class="live-demo__copy">
+                            <p id="demo-door-label">Amitai's door</p>
+                            <strong id="demo-door-status">Connecting…</strong>
+                            <span id="demo-door-detail">Reading the current door status</span>
+                        </div>
+                    </div>
+                    <div class="live-demo__footer"><span>Updates automatically</span><span>Powered by TzufGuard hardware</span></div>
+                </aside>
             </div>
             <div class="brand-status"><span class="pulse-dot"></span><span>Secure door monitoring</span></div>
         </div>
