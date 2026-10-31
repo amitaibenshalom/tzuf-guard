@@ -32,8 +32,8 @@ def test_homepage(client):
 
 
 def test_frontend_assets(client):
-    assert client.get("/static/app.css").status_code == 200
-    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/app.css").status_code == 200
+    assert client.get("/app.js").status_code == 200
 
 
 def test_health_and_cors(client):

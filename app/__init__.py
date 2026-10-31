@@ -12,7 +12,14 @@ from .routes.push_devices import push_devices_bp
 
 
 def create_app(config_name=None):
-    app = Flask(__name__, template_folder="../templates")
+    # Vercel serves public/ directly from its CDN. Point Flask at the same
+    # directory so local development and tests use identical asset URLs.
+    app = Flask(
+        __name__,
+        template_folder="../templates",
+        static_folder="../public",
+        static_url_path="",
+    )
     config = config_by_name(config_name)
     app.config.from_object(config)
     config.configure_app(app)

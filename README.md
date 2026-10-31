@@ -20,11 +20,11 @@ tzuf-guard/
 ├── api/index.py          # Vercel Python entrypoint
 ├── app/                  # Flask package, API, services, and static web assets
 ├── migrations/           # Alembic migrations
+├── public/               # CSS and JavaScript served by Vercel's CDN
 ├── templates/            # web application shell
 ├── tests/                # focused API tests
 ├── requirements.txt      # production dependencies
 ├── requirements-dev.txt  # test/dev dependencies
-├── vercel.json           # routes all traffic to Flask
 └── .env.example
 ```
 
