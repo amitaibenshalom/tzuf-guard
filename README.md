@@ -147,7 +147,7 @@ pollute the activity timeline.
 ## Security Notes
 
 - Passwords are hashed.
-- Door setup phrases contain 84 bits of entropy and are SHA-256 hashed before
+- Door setup phrases contain about 77.5 bits of entropy and are SHA-256 hashed before
   storage.
 - A setup phrase appears only in the create/regenerate response. It cannot be
   retrieved later because only its hash is stored.

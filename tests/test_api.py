@@ -366,7 +366,7 @@ def test_create_door_generates_one_time_word_phrase(client, auth):
     body = response.get_json()
     phrase = body["provisioning_token"]
     words = phrase.split("-")
-    assert len(words) == 12
+    assert len(words) == 6
     assert all(word in DOOR_TOKEN_WORDS for word in words)
 
     listed = client.get("/api/doors", headers=auth).get_json()["doors"][0]
