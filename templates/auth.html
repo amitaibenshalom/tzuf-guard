@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#102f27">
+    <title>{{ "Log in" if auth_mode == "login" else "Create account" }} · TzufGuard</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="module" src="{{ url_for('static', filename='auth.js') }}"></script>
+</head>
+<body class="auth-page" data-auth-mode="{{ auth_mode }}" data-google-client-id="{{ google_client_id }}">
+    {% include "_icons.html" %}
+    <main class="auth-layout">
+        <section class="auth-context" aria-label="About TzufGuard">
+            <a class="brand brand--light" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+            <div class="auth-context__copy">
+                <p class="eyebrow eyebrow--mint">Your home, at a glance</p>
+                <h1>Every entrance. One calm view.</h1>
+                <p>Check the current state, see how long it has held, and return to the exact moment anything changed.</p>
+                <div class="auth-signal" aria-hidden="true">
+                    <div class="auth-signal__door"><svg><use href="#icon-logo"/></svg></div>
+                    <div><span>Connected entrance</span><strong>Closed</strong><small>Monitoring continuously</small></div>
+                </div>
+            </div>
+            <p class="auth-context__note"><span></span>Secure door monitoring</p>
+        </section>
+
+        <section class="auth-workspace">
+            <a class="back-link" href="/"><span aria-hidden="true">←</span> Home</a>
+            <div class="auth-card">
+                <p class="eyebrow">{{ "Welcome back" if auth_mode == "login" else "Get started" }}</p>
+                <h2>{{ "Log in to TzufGuard" if auth_mode == "login" else "Create your account" }}</h2>
+                <p class="auth-card__intro">{{ "Your monitored doors are waiting." if auth_mode == "login" else "Add your first connected door in a few minutes." }}</p>
+
+                {% if auth_mode == "login" %}
+                <form id="auth-form" class="stack-form" data-endpoint="/auth/login">
+                    <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+                    <label>Password<input name="password" type="password" autocomplete="current-password" required placeholder="Your password"></label>
+                    <div class="form-support"><button id="forgot-password-button" class="link-button" type="button">Forgot password?</button></div>
+                    <button class="button button--forest button--full" type="submit">Log in</button>
+                </form>
+                {% else %}
+                <form id="auth-form" class="stack-form" data-endpoint="/auth/register">
+                    <label>Name<input name="name" autocomplete="name" maxlength="120" required placeholder="Your name"></label>
+                    <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+                    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required placeholder="At least 8 characters"></label>
+                    <button class="button button--forest button--full" type="submit">Create account</button>
+                </form>
+                {% endif %}
+
+                <div class="divider"><span>or continue with</span></div>
+                <div id="google-button" class="google-button"></div>
+                <p id="auth-error" class="form-error" role="alert"></p>
+                <p class="auth-switch">
+                    {% if auth_mode == "login" %}New to TzufGuard? <a href="/register">Create an account</a>{% else %}Already have an account? <a href="/login">Log in</a>{% endif %}
+                </p>
+            </div>
+        </section>
+    </main>
+
+    {% if auth_mode == "login" %}
+    <dialog id="forgot-dialog" class="modal modal--narrow"><form id="forgot-form" class="modal-card"><div class="modal-head"><div><p class="eyebrow">Account recovery</p><h2>Reset your password</h2></div><button class="icon-button" data-close type="button" aria-label="Close"><svg><use href="#icon-close"/></svg></button></div><p>Enter your email and we will send reset instructions if an account exists.</p><label>Email<input name="email" type="email" autocomplete="email" required></label><p class="form-error" data-form-error></p><button class="button button--forest button--full" type="submit">Send reset link</button></form></dialog>
+    {% endif %}
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Page not found · TzufGuard</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="not-found-page">
+    {% include "_icons.html" %}
+    <main class="not-found-card">
+        <div class="empty-icon"><svg><use href="#icon-logo"/></svg></div>
+        <p class="eyebrow">404 · Not found</p>
+        <h1>This doorway leads nowhere.</h1>
+        <p>The page may have moved, or the address may be incorrect.</p>
+        <a class="button button--forest" href="/">Return home</a>
+    </main>
+</body>
+</html>

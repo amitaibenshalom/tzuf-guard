@@ -5,13 +5,16 @@ deployed to Vercel and stores production data in Turso/libSQL.
 
 It serves:
 
-- `/` as the responsive account and door-management dashboard.
+- `/` as the public product homepage and live sensor demo.
+- `/login` and `/register` as dedicated authentication pages.
+- `/reset-password` as the password-recovery destination.
+- `/app/doors` as the authenticated door-management application.
 - `/api/...` as the browser, mobile client, and sensor REST API.
 - Turso/libSQL as the only production database.
 
 Users can register with name, email, and password or sign in with Google. The
-dashboard supports multiple doors, one-time sensor setup phrases, live status,
-editing, deletion, and paginated state-change history.
+authenticated application supports multiple doors, one-time sensor setup
+phrases, live status, editing, deletion, and paginated state-change history.
 
 ## Structure
 
@@ -57,9 +60,9 @@ SMTP_USE_TLS=true
 ```
 
 `PUBLIC_DEMO_DOOR_ID` selects the single door shown in the large live demo on
-the logged-out homepage. The public endpoint exposes only the configured label
-and the current `opened`/`closed` state. It never exposes the door's owner,
-location, device name, setup phrase, timestamps, or history.
+the public homepage. The public endpoint exposes only the configured label, the
+current `opened`/`closed` state, and its elapsed duration. It never exposes the
+door's owner, location, device name, setup phrase, exact timestamps, or history.
 
 Production startup fails fast if Turso or secrets are missing.
 
@@ -89,6 +92,8 @@ Visit:
 
 ```text
 http://localhost:5000/
+http://localhost:5000/login
+http://localhost:5000/app/doors
 http://localhost:5000/api/health
 ```
 

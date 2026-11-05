@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, redirect, render_template, request
 from flask_cors import CORS
 
 from .config import config_by_name
@@ -48,10 +48,37 @@ def register_routes(app):
 
     @app.get("/")
     def home():
+        return render_template("home.html")
+
+    @app.get("/login")
+    def login_page():
         return render_template(
-            "index.html",
+            "auth.html",
+            auth_mode="login",
             google_client_id=app.config["GOOGLE_WEB_CLIENT_ID"],
         )
+
+    @app.get("/register")
+    def register_page():
+        return render_template(
+            "auth.html",
+            auth_mode="register",
+            google_client_id=app.config["GOOGLE_WEB_CLIENT_ID"],
+        )
+
+    @app.get("/reset-password")
+    def reset_password_page():
+        return render_template("reset_password.html")
+
+    @app.get("/app")
+    @app.get("/dashboard")
+    @app.get("/doors")
+    def app_redirect():
+        return redirect("/app/doors")
+
+    @app.get("/app/doors")
+    def doors_page():
+        return render_template("dashboard.html")
 
     @app.get("/api/health")
     def health():
@@ -75,6 +102,8 @@ def register_error_handlers(app):
 
     @app.errorhandler(404)
     def not_found(error):
+        if not request.path.startswith("/api/"):
+            return render_template("404.html"), 404
         return error_response("Not found.", 404, "not_found")
 
     @app.errorhandler(405)

@@ -28,12 +28,64 @@ def test_homepage(client):
     assert response.status_code == 200
     assert b"TzufGuard" in response.data
     assert b"Know the moment a door changes" in response.data
-    assert b"Working on something new" not in response.data
+    assert b'id="public-demo"' in response.data
+    assert b'id="door-grid"' not in response.data
+    assert b'id="auth-form"' not in response.data
+
+
+def test_web_pages_have_separate_responsibilities(client):
+    login = client.get("/login")
+    register = client.get("/register")
+    reset = client.get("/reset-password")
+    dashboard = client.get("/app/doors")
+
+    assert login.status_code == 200
+    assert b'data-auth-mode="login"' in login.data
+    assert b'data-endpoint="/auth/login"' in login.data
+    assert b'id="door-grid"' not in login.data
+
+    assert register.status_code == 200
+    assert b'data-auth-mode="register"' in register.data
+    assert b'data-endpoint="/auth/register"' in register.data
+
+    assert reset.status_code == 200
+    assert b'id="reset-form"' in reset.data
+
+    assert dashboard.status_code == 200
+    assert b'id="door-grid"' in dashboard.data
+    assert b'id="auth-form"' not in dashboard.data
+
+
+def test_legacy_app_routes_redirect_to_canonical_dashboard(client):
+    for path in ("/app", "/dashboard", "/doors"):
+        response = client.get(path)
+        assert response.status_code == 302
+        assert response.headers["Location"] == "/app/doors"
+
+
+def test_web_404_is_html_and_api_404_stays_json(client):
+    web = client.get("/missing-page")
+    api = client.get("/api/missing-page")
+
+    assert web.status_code == 404
+    assert web.content_type.startswith("text/html")
+    assert b"This doorway leads nowhere" in web.data
+    assert api.status_code == 404
+    assert api.is_json
+    assert api.get_json()["error"]["code"] == "not_found"
 
 
 def test_frontend_assets(client):
-    assert client.get("/app.css").status_code == 200
-    assert client.get("/app.js").status_code == 200
+    for asset in (
+        "/app.css",
+        "/favicon.svg",
+        "/common.js",
+        "/home.js",
+        "/auth.js",
+        "/reset-password.js",
+        "/dashboard.js",
+    ):
+        assert client.get(asset).status_code == 200
 
 
 def test_health_and_cors(client):

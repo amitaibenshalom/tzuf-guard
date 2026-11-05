@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="TzufGuard keeps every connected door visible with live status, clear history, and simple Wi-Fi sensor setup.">
+    <meta name="theme-color" content="#102f27">
+    <meta property="og:title" content="TzufGuard · Know when a door changes">
+    <meta property="og:description" content="Live door status, clear history, and simple Wi-Fi sensor setup.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://amitaibenshalom.com/">
+    <title>TzufGuard · Know when a door changes</title>
+    <link rel="canonical" href="https://amitaibenshalom.com/">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script type="module" src="{{ url_for('static', filename='home.js') }}"></script>
+</head>
+<body class="marketing-page">
+    {% include "_icons.html" %}
+
+    <div class="hero-shell">
+        <header class="site-header page-width">
+            <a class="brand brand--light" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+            <nav class="site-nav" aria-label="Primary navigation">
+                <a href="#how-it-works">How it works</a>
+                <a id="home-login-link" href="/login">Log in</a>
+                <a id="home-nav-cta" class="button button--mint button--small" href="/register">Create account</a>
+            </nav>
+        </header>
+
+        <section class="hero page-width" aria-labelledby="hero-title">
+            <div class="hero-copy">
+                <p class="eyebrow eyebrow--mint">Calm, connected, aware</p>
+                <h1 id="hero-title">Know the moment a door changes.</h1>
+                <p class="hero-intro">A clear view of every entrance, with simple sensor setup and a reliable timeline of every open and close.</p>
+                <div class="hero-actions">
+                    <a id="home-primary-cta" class="button button--mint" href="/register">Set up your first door <svg><use href="#icon-arrow"/></svg></a>
+                    <a id="home-secondary-login" class="button button--ghost-light" href="/login">Log in</a>
+                </div>
+                <ul class="hero-assurances" aria-label="Product highlights">
+                    <li><svg><use href="#icon-wifi"/></svg>Guided Wi-Fi setup</li>
+                    <li><svg><use href="#icon-history"/></svg>State-change history</li>
+                    <li><svg><use href="#icon-shield"/></svg>Private per-door access</li>
+                </ul>
+            </div>
+
+            <aside id="public-demo" class="live-demo is-loading" aria-label="Live door sensor demonstration" aria-live="polite">
+                <div class="live-demo__top"><span>Live from TzufGuard</span><span class="live-demo__signal"><i></i>Real sensor</span></div>
+                <div class="live-demo__body">
+                    <div class="live-demo__door" aria-hidden="true"><svg><use href="#icon-logo"/></svg></div>
+                    <div class="live-demo__copy">
+                        <p id="demo-door-label">Amitai's door</p>
+                        <strong id="demo-door-status">Connecting…</strong>
+                        <span id="demo-door-detail">Reading the current door status</span>
+                    </div>
+                </div>
+                <div class="live-demo__footer"><span>Updates automatically</span><span>Current state only—private details stay private</span></div>
+            </aside>
+        </section>
+    </div>
+
+    <main>
+        <section id="how-it-works" class="process-section page-width" aria-labelledby="process-title">
+            <div class="section-heading">
+                <p class="eyebrow">From sensor to certainty</p>
+                <h2 id="process-title">A straightforward path from soldered hardware to a live door.</h2>
+                <p>Create the door online, connect the sensor through its local setup network, and let TzufGuard keep the timeline.</p>
+            </div>
+            <ol class="process-list">
+                <li><span>01</span><div><h3>Create a door</h3><p>Name the entrance and receive its one-time six-word setup phrase.</p></div></li>
+                <li><span>02</span><div><h3>Connect the sensor</h3><p>Join the sensor's temporary Wi-Fi network and enter your home Wi-Fi details.</p></div></li>
+                <li><span>03</span><div><h3>See every change</h3><p>Read the current state at a glance and open the door's complete activity history.</p></div></li>
+            </ol>
+        </section>
+
+        <section class="capability-section page-width" aria-labelledby="capability-title">
+            <div class="capability-lead">
+                <p class="eyebrow">Built around the doorway</p>
+                <h2 id="capability-title">The important signal stays obvious.</h2>
+                <p>Open or closed, for how long, and when it last changed—without turning your home into a complicated control room.</p>
+                <a class="text-link" href="/register">Create your account <svg><use href="#icon-arrow"/></svg></a>
+            </div>
+            <div class="capability-stack">
+                <article><svg><use href="#icon-clock"/></svg><div><h3>Live duration</h3><p>A running timer shows how long the current state has held.</p></div></article>
+                <article><svg><use href="#icon-history"/></svg><div><h3>A clean timeline</h3><p>Repeated check-ins stay out of the way; history records actual state changes.</p></div></article>
+                <article><svg><use href="#icon-key"/></svg><div><h3>Simple provisioning</h3><p>A memorable phrase connects each physical sensor to exactly one door.</p></div></article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer page-width">
+        <a class="brand" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+        <p>Quiet awareness for the doors that matter.</p>
+        <a href="/login">Log in</a>
+    </footer>
+</body>
+</html>
