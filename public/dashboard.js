@@ -3,6 +3,8 @@ import {
     hasSession, icon, relativeTime, setBusy, statusMeta, updateDurationCounters,
 } from "/common.js";
 
+const DOOR_STATUS_EVENT = "door.status.changed";
+
 if (!hasSession()) location.replace("/login?next=%2Fapp%2Fdoors");
 
 const state = {
@@ -14,6 +16,7 @@ const state = {
     hasMoreEvents: false,
     confirmAction: null,
     toastTimer: null,
+    realtime: null,
 };
 
 const doorGrid = $("#door-grid");
@@ -200,7 +203,8 @@ async function loadMoreEvents() {
         const nextPage = state.eventPage + 1;
         const payload = await api(`/doors/${state.activeDoor.id}/events?page=${nextPage}&per_page=30`);
         state.eventPage = nextPage;
-        state.events.push(...payload.events);
+        const knownIds = new Set(state.events.map(event => event.id));
+        state.events.push(...payload.events.filter(event => !knownIds.has(event.id)));
         state.hasMoreEvents = payload.pagination.has_more;
         renderHistory();
     } catch (error) {
@@ -208,6 +212,112 @@ async function loadMoreEvents() {
     } finally {
         button.disabled = false;
     }
+}
+
+async function refreshActiveDoor() {
+    const doorId = state.activeDoor?.id;
+    if (!doorId) return;
+    try {
+        const [doorPayload, eventsPayload] = await Promise.all([
+            api(`/doors/${doorId}`),
+            api(`/doors/${doorId}/events?page=1&per_page=30`),
+        ]);
+        if (state.activeDoor?.id !== doorId) return;
+        state.activeDoor = doorPayload.door;
+        state.events = eventsPayload.events;
+        state.eventPage = 1;
+        state.hasMoreEvents = eventsPayload.pagination.has_more;
+        $("#detail-name").textContent = state.activeDoor.name;
+        $("#detail-location").textContent = state.activeDoor.location || "No location set";
+        renderDetailStatus(state.activeDoor);
+        renderHistory();
+    } catch (error) {
+        if (error.status !== 401) toast("Live state could not be refreshed.");
+    }
+}
+
+function applyRealtimeDoorUpdate(payload) {
+    const door = payload?.version === 1 ? payload.door : null;
+    if (!door || !Number.isInteger(door.id)) return;
+
+    const index = state.doors.findIndex(item => item.id === door.id);
+    if (index >= 0) state.doors[index] = { ...state.doors[index], ...door };
+    else state.doors.push(door);
+    renderDoors();
+
+    if (state.activeDoor?.id !== door.id) return;
+    state.activeDoor = { ...state.activeDoor, ...door };
+    renderDetailStatus(state.activeDoor);
+
+    const doorEvent = payload.event;
+    if (doorEvent && !state.events.some(item => item.id === doorEvent.id)) {
+        state.events.unshift(doorEvent);
+        renderHistory();
+    }
+}
+
+async function resyncRealtimeState() {
+    await Promise.all([loadDoors(true), refreshActiveDoor()]);
+}
+
+function stopRealtime() {
+    const realtime = state.realtime;
+    if (!realtime) return;
+    realtime.channel.unsubscribe(DOOR_STATUS_EVENT, realtime.onMessage);
+    realtime.channel.off("attached", realtime.onAttached);
+    realtime.channel.off("update", realtime.onUpdate);
+    realtime.client.connection.off("failed", realtime.onFailed);
+    realtime.channel.detach().catch(() => undefined);
+    realtime.client.close();
+    state.realtime = null;
+}
+
+async function startRealtime() {
+    if (!window.AblyPubSub?.createClient) throw new Error("The realtime client did not load.");
+    const credentials = await api("/realtime/token", { method: "POST" });
+    let initialToken = credentials.token;
+    const client = window.AblyPubSub.createClient({
+        echoMessages: false,
+        authCallback: async (_tokenParams, callback) => {
+            try {
+                if (initialToken) {
+                    const token = initialToken;
+                    initialToken = null;
+                    callback(null, token);
+                    return;
+                }
+                const refreshed = await api("/realtime/token", { method: "POST" });
+                callback(null, refreshed.token);
+            } catch (error) {
+                callback(errorMessage(error), null);
+            }
+        },
+    });
+    const channel = client.channels.get(credentials.channel);
+    const realtime = {
+        client,
+        channel,
+        attachedOnce: false,
+        onMessage: message => applyRealtimeDoorUpdate(message.data),
+        onAttached: change => {
+            if (realtime.attachedOnce && !change.resumed) resyncRealtimeState();
+            realtime.attachedOnce = true;
+        },
+        onUpdate: change => {
+            if (!change.resumed) resyncRealtimeState();
+        },
+        onFailed: change => {
+            console.error("Realtime connection failed:", change.reason?.message || change.reason || "Unknown error");
+        },
+    };
+    state.realtime = realtime;
+
+    // Install continuity handlers before subscribing so no gap can be missed
+    // during the initial channel attachment.
+    channel.on("attached", realtime.onAttached);
+    channel.on("update", realtime.onUpdate);
+    client.connection.on("failed", realtime.onFailed);
+    await channel.subscribe(DOOR_STATUS_EVENT, realtime.onMessage);
 }
 
 function showConfirm(title, copy, buttonText, action) {
@@ -280,6 +390,7 @@ async function copyToken() {
 
 function bindEvents() {
     $("#logout-button").addEventListener("click", () => {
+        stopRealtime();
         clearSession();
         location.assign("/");
     });
@@ -323,6 +434,9 @@ async function initialize() {
         state.user = payload.user;
         $("#user-greeting").textContent = state.user?.name || state.user?.email || "";
         await loadDoors();
+        startRealtime().catch(error => {
+            console.error("Realtime updates are unavailable:", errorMessage(error));
+        });
     } catch (error) {
         if (error.status !== 401) doorError.classList.remove("hidden");
     }
@@ -330,9 +444,7 @@ async function initialize() {
 
 initialize();
 setInterval(updateDurationCounters, 1000);
-setInterval(() => {
-    if (!document.hidden) loadDoors(true);
-}, 30000);
 document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && hasSession()) loadDoors(true);
+    if (!document.hidden && hasSession()) resyncRealtimeState();
 });
+window.addEventListener("pagehide", stopRealtime);

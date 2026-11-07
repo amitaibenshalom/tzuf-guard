@@ -1,9 +1,10 @@
 from datetime import timezone
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app, jsonify, request
 
 from app.extensions import db
 from app.models import Door, utcnow
+from app.services.realtime import realtime_service
 
 
 public_demo_bp = Blueprint("public_demo", __name__)
@@ -54,3 +55,13 @@ def get_demo_door():
         status=status,
         duration_seconds=elapsed_seconds(door.status_changed_at),
     )
+
+
+@public_demo_bp.post("/demo-door/realtime-token")
+def create_demo_realtime_token():
+    payload = request.get_json(silent=True) or {}
+    response = jsonify(
+        realtime_service.public_demo_credentials(payload.get("client_id"))
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response

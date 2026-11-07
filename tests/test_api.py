@@ -1,5 +1,7 @@
+import json
 from datetime import timedelta
 
+import jwt
 import pytest
 import requests
 
@@ -8,6 +10,7 @@ from app.extensions import db
 from app.models import Door, DoorEvent, PasswordResetToken, PushDevice, User, utcnow
 from app.security import DOOR_TOKEN_WORDS, hash_reset_token
 from app.services.notifications import NotificationService
+from app.services.realtime import RealtimeService
 
 from .conftest import auth_headers, login_user, register_user
 
@@ -538,6 +541,217 @@ def test_esp32_status_update_success(client, auth):
     assert body["event"]["received_at"].endswith("+00:00")
     assert "battery_mv" not in body["door"]
     assert "battery_mv" not in body["event"]
+
+
+def test_realtime_token_is_private_and_subscribe_only(client, auth, app):
+    secret = "test-secret-with-at-least-thirty-two-bytes"
+    app.config["ABLY_API_KEY"] = f"test-app.test-key:{secret}"
+    response = client.post("/api/realtime/token", headers=auth)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    claims = jwt.decode(body["token"], secret, algorithms=["HS256"])
+    headers = jwt.get_unverified_header(body["token"])
+
+    assert body["channel"] == "doors:user:1"
+    assert headers["kid"] == "test-app.test-key"
+    assert claims["x-ably-clientId"] == "user-1"
+    assert json.loads(claims["x-ably-capability"]) == {
+        "doors:user:1": ["subscribe"]
+    }
+
+
+def test_realtime_token_requires_login(client):
+    response = client.post("/api/realtime/token")
+
+    assert response.status_code == 401
+
+
+def test_public_demo_realtime_token_is_subscribe_only(client, app):
+    secret = "test-secret-with-at-least-thirty-two-bytes"
+    app.config["ABLY_API_KEY"] = f"test-app.test-key:{secret}"
+
+    client_id = "demo-0123456789abcdef0123456789abcdef"
+    response = client.post(
+        "/api/public/demo-door/realtime-token",
+        json={"client_id": client_id},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    claims = jwt.decode(body["token"], secret, algorithms=["HS256"])
+    assert body["channel"] == "demo:public-door"
+    assert claims["x-ably-clientId"] == client_id
+    assert json.loads(claims["x-ably-capability"]) == {
+        "demo:public-door": ["subscribe"]
+    }
+
+
+def test_public_demo_realtime_token_rejects_invalid_client_id(client, app):
+    app.config["ABLY_API_KEY"] = (
+        "test-app.test-key:test-secret-with-at-least-thirty-two-bytes"
+    )
+
+    response = client.post(
+        "/api/public/demo-door/realtime-token",
+        json={"client_id": "shared-or-user-controlled"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_realtime_client"
+
+
+def test_realtime_publish_uses_ably_server_rest_request(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def capture_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr("app.services.realtime.requests.post", capture_post)
+
+    RealtimeService._publish(
+        "test-app.test-key:server-secret",
+        [("doors:user:9", "door.status.changed", {"version": 1})],
+    )
+
+    assert len(calls) == 1
+    url, kwargs = calls[0]
+    assert url.endswith("/channels/doors%3Auser%3A9/messages")
+    assert kwargs["params"] == {"clientType": "server"}
+    assert kwargs["auth"] == ("test-app.test-key", "server-secret")
+    assert kwargs["headers"]["X-Ably-Version"] == "6"
+    assert kwargs["headers"]["Ably-Agent"].startswith("tzufguard-server/")
+    assert kwargs["json"] == {
+        "name": "door.status.changed",
+        "data": {"version": 1},
+    }
+    assert kwargs["timeout"] == (3, 5)
+
+
+def test_status_change_publishes_realtime_once(client, auth, app, monkeypatch):
+    published = []
+
+    def capture_publish(api_key, publications):
+        published.extend((api_key, *publication) for publication in publications)
+
+    app.config["ABLY_API_KEY"] = (
+        "test-app.test-key:test-secret-with-at-least-thirty-two-bytes"
+    )
+    monkeypatch.setattr(
+        RealtimeService,
+        "_publish",
+        staticmethod(capture_publish),
+    )
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front Door", "token": "realtime-secret-token"},
+    )
+
+    first = client.post(
+        "/api/door-status",
+        json={"token": "realtime-secret-token", "status": "opened"},
+    )
+    second = client.post(
+        "/api/door-status",
+        json={"token": "realtime-secret-token", "status": "opened"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert len(published) == 1
+    assert published[0][1] == "doors:user:1"
+    assert published[0][2] == "door.status.changed"
+    assert published[0][3]["version"] == 1
+    assert published[0][3]["door"]["last_status"] == "opened"
+    assert published[0][3]["event"]["status"] == "opened"
+
+
+def test_public_demo_realtime_payload_exposes_only_public_fields(
+    client, auth, app, monkeypatch
+):
+    published = []
+
+    def capture_publish(_api_key, publications):
+        published.extend(publications)
+
+    app.config["ABLY_API_KEY"] = (
+        "test-app.test-key:test-secret-with-at-least-thirty-two-bytes"
+    )
+    monkeypatch.setattr(
+        RealtimeService,
+        "_publish",
+        staticmethod(capture_publish),
+    )
+    created = client.post(
+        "/api/doors",
+        headers=auth,
+        json={
+            "name": "Private bedroom",
+            "location": "Home",
+            "token": "public-demo-realtime-token",
+        },
+    ).get_json()["door"]
+    app.config["PUBLIC_DEMO_DOOR_ID"] = str(created["id"])
+
+    response = client.post(
+        "/api/door-status",
+        json={
+            "token": "public-demo-realtime-token",
+            "status": "opened",
+            "device": "Private device name",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(published) == 2
+    channel, event_name, payload = published[1]
+    assert channel == "demo:public-door"
+    assert event_name == "demo.status.changed"
+    assert set(payload) == {
+        "version",
+        "available",
+        "label",
+        "status",
+        "duration_seconds",
+    }
+    assert payload["status"] == "opened"
+    assert "Private bedroom" not in payload.values()
+    assert "Private device name" not in payload.values()
+
+
+def test_realtime_failure_does_not_reject_sensor_report(
+    client, auth, app, monkeypatch
+):
+    def fail_publish(*_args):
+        raise RuntimeError("Ably is unavailable")
+
+    app.config["ABLY_API_KEY"] = (
+        "test-app.test-key:test-secret-with-at-least-thirty-two-bytes"
+    )
+    monkeypatch.setattr(
+        RealtimeService,
+        "_publish",
+        staticmethod(fail_publish),
+    )
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front Door", "token": "realtime-failure-token"},
+    )
+
+    response = client.post(
+        "/api/door-status",
+        json={"token": "realtime-failure-token", "status": "closed"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["status_changed"] is True
 
 
 def test_unknown_device_token(client):

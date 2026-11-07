@@ -5,6 +5,7 @@ from app.extensions import db
 from app.models import Door, DoorEvent, utcnow
 from app.security import hash_door_token
 from app.services.notifications import notification_service
+from app.services.realtime import realtime_service
 
 
 def create_door_for_user(user, name, token, location=None):
@@ -51,6 +52,7 @@ def update_door_status(token, status, device_name=None):
     db.session.commit()
 
     if status_changed:
+        realtime_service.publish_door_status_changed(door, event)
         notification_service.send_door_status_changed(door, previous_status)
 
     return door, event, status_changed

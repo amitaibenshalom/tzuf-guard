@@ -61,6 +61,8 @@ class Config:
         ]
 
     NOTIFICATIONS_ENABLED = bool_from_env("NOTIFICATIONS_ENABLED", default=True)
+    ABLY_API_KEY = os.getenv("ABLY_API_KEY", "").strip()
+    ABLY_TOKEN_TTL_SECONDS = int(os.getenv("ABLY_TOKEN_TTL_SECONDS", "3600"))
     PUBLIC_DEMO_DOOR_ID = os.getenv("PUBLIC_DEMO_DOOR_ID", "").strip()
     PUBLIC_DEMO_DOOR_LABEL = os.getenv(
         "PUBLIC_DEMO_DOOR_LABEL", "Amitai's door"
@@ -106,6 +108,15 @@ class Config:
             raise RuntimeError("SECRET_KEY must be at least 32 characters.")
         if len(app.config["JWT_SECRET_KEY"]) < 32:
             raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters.")
+        ably_api_key = app.config.get("ABLY_API_KEY", "")
+        if ably_api_key:
+            key_name, separator, key_secret = ably_api_key.partition(":")
+            if not separator or not key_name or not key_secret:
+                raise RuntimeError("ABLY_API_KEY must use the name:secret format.")
+        if not 60 <= app.config["ABLY_TOKEN_TTL_SECONDS"] <= 86400:
+            raise RuntimeError(
+                "ABLY_TOKEN_TTL_SECONDS must be between 60 and 86400."
+            )
 
 
 class TestingConfig(Config):
@@ -116,6 +127,8 @@ class TestingConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {}
     CORS_ORIGINS = "*"
     NOTIFICATIONS_ENABLED = True
+    ABLY_API_KEY = ""
+    ABLY_TOKEN_TTL_SECONDS = 3600
     PUBLIC_DEMO_DOOR_ID = ""
     PUBLIC_DEMO_DOOR_LABEL = "Amitai's door"
     GOOGLE_OAUTH_CLIENT_IDS = [

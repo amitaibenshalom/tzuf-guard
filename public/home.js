@@ -1,6 +1,32 @@
 import { $, hasSession, setDurationCounter, updateDurationCounters } from "/common.js";
 
 const publicDemo = $("#public-demo");
+const PUBLIC_DEMO_EVENT = "demo.status.changed";
+const DEMO_CLIENT_STORAGE_KEY = "tzufguard_demo_client_id";
+let realtime = null;
+let transientDemoClientId = null;
+
+function demoClientId() {
+    try {
+        const existing = localStorage.getItem(DEMO_CLIENT_STORAGE_KEY);
+        if (/^demo-[a-f0-9]{32}$/.test(existing || "")) return existing;
+    } catch {
+        // Storage can be unavailable in restrictive privacy modes. Keeping the
+        // ID in memory still makes token renewal stable for this page session.
+    }
+    if (transientDemoClientId) return transientDemoClientId;
+
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const clientId = `demo-${Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("")}`;
+    transientDemoClientId = clientId;
+    try {
+        localStorage.setItem(DEMO_CLIENT_STORAGE_KEY, clientId);
+    } catch {
+        // The in-memory ID above is sufficient when persistent storage is blocked.
+    }
+    return clientId;
+}
 
 function durationStartedAt(duration) {
     if (duration === null || duration === undefined || !Number.isFinite(Number(duration))) return null;
@@ -38,6 +64,67 @@ async function loadPublicDemo() {
     }
 }
 
+async function getRealtimeCredentials() {
+    const response = await fetch("/api/public/demo-door/realtime-token", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: demoClientId() }),
+    });
+    if (!response.ok) throw new Error("Demo realtime authentication failed");
+    return response.json();
+}
+
+function stopRealtime() {
+    if (!realtime) return;
+    realtime.channel.unsubscribe(PUBLIC_DEMO_EVENT, realtime.onMessage);
+    realtime.channel.off("attached", realtime.onAttached);
+    realtime.channel.off("update", realtime.onUpdate);
+    realtime.channel.detach().catch(() => undefined);
+    realtime.client.close();
+    realtime = null;
+}
+
+async function startRealtime() {
+    if (!window.AblyPubSub?.createClient) throw new Error("The realtime client did not load");
+    const credentials = await getRealtimeCredentials();
+    let initialToken = credentials.token;
+    const client = window.AblyPubSub.createClient({
+        echoMessages: false,
+        authCallback: async (_tokenParams, callback) => {
+            try {
+                if (initialToken) {
+                    const token = initialToken;
+                    initialToken = null;
+                    callback(null, token);
+                    return;
+                }
+                const refreshed = await getRealtimeCredentials();
+                callback(null, refreshed.token);
+            } catch (error) {
+                callback(error instanceof Error ? error.message : "Realtime authentication failed", null);
+            }
+        },
+    });
+    const channel = client.channels.get(credentials.channel);
+    const connection = {
+        client,
+        channel,
+        attachedOnce: false,
+        onMessage: message => renderPublicDemo(message.data),
+        onAttached: change => {
+            if (connection.attachedOnce && !change.resumed) loadPublicDemo();
+            connection.attachedOnce = true;
+        },
+        onUpdate: change => {
+            if (!change.resumed) loadPublicDemo();
+        },
+    };
+    realtime = connection;
+    channel.on("attached", connection.onAttached);
+    channel.on("update", connection.onUpdate);
+    await channel.subscribe(PUBLIC_DEMO_EVENT, connection.onMessage);
+}
+
 if (hasSession()) {
     $("#home-login-link").classList.add("hidden");
     $("#home-nav-cta").textContent = "Open dashboard";
@@ -48,7 +135,9 @@ if (hasSession()) {
 }
 
 loadPublicDemo();
+startRealtime().catch(error => console.error("Live demo realtime is unavailable:", error));
 setInterval(updateDurationCounters, 1000);
-setInterval(() => {
+document.addEventListener("visibilitychange", () => {
     if (!document.hidden) loadPublicDemo();
-}, 10000);
+});
+window.addEventListener("pagehide", stopRealtime);

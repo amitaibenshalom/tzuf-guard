@@ -44,6 +44,8 @@ TURSO_AUTH_TOKEN=<your Turso auth token>
 CORS_ENABLED=true
 CORS_ORIGINS=https://your-domain.example
 NOTIFICATIONS_ENABLED=true
+ABLY_API_KEY=<server-only Ably API key with publish and subscribe capability>
+ABLY_TOKEN_TTL_SECONDS=3600
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
@@ -145,6 +147,11 @@ Push:
 - `POST /api/push-devices`
 - `DELETE /api/push-devices`
 
+Realtime:
+
+- `POST /api/realtime/token` — issues a short-lived, subscribe-only Ably JWT for the signed-in user's private door channel
+- `POST /api/public/demo-door/realtime-token` — accepts a stable anonymous `client_id` (`demo-` plus 32 lowercase hex characters) and issues a short-lived, subscribe-only JWT for the public demo channel
+
 Authenticated app endpoints require:
 
 ```http
@@ -165,5 +172,8 @@ pollute the activity timeline.
   retrieved later because only its hash is stored.
 - API responses never expose stored token hashes or password hashes.
 - Users can only access their own doors.
+- Ably API keys remain server-only. Browser and mobile clients receive short-lived JWTs scoped to their own private channel with subscribe-only capability.
+- The homepage demo uses a separate public channel whose payload contains only the same safe status fields exposed by the public demo endpoint.
+- Turso remains the source of truth. Ably publishes only committed status changes, and an Ably outage does not reject sensor reports.
 - CORS is scoped to `/api/*`.
 - Push notification delivery sends Expo push notifications when `NOTIFICATIONS_ENABLED=true`.
