@@ -172,6 +172,7 @@ pollute the activity timeline.
   retrieved later because only its hash is stored.
 - API responses never expose stored token hashes or password hashes.
 - Users can only access their own doors.
+- Door pinning and per-door notification preferences are stored with each door, so they remain consistent across clients.
 - Ably API keys remain server-only. Browser and mobile clients receive short-lived JWTs scoped to their own private channel with subscribe-only capability.
 - The homepage demo uses a separate public channel whose payload contains only the same safe status fields exposed by the public demo endpoint.
 - Turso remains the source of truth. Ably publishes only committed status changes, and an Ably outage does not reject sensor reports.

@@ -13,7 +13,10 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 class NotificationService:
     def send_door_status_changed(self, door, previous_status):
-        if not current_app.config["NOTIFICATIONS_ENABLED"]:
+        if (
+            not current_app.config["NOTIFICATIONS_ENABLED"]
+            or not door.notifications_enabled
+        ):
             return
 
         devices = PushDevice.query.filter_by(user_id=door.user_id).all()

@@ -31,6 +31,8 @@ def door_to_dict(door, include_events=False, events=None):
         "status_changed_at": isoformat(door.status_changed_at),
         "last_seen_at": isoformat(door.last_seen_at),
         "device_name": door.device_name,
+        "notifications_enabled": door.notifications_enabled,
+        "is_pinned": door.is_pinned,
         "created_at": isoformat(door.created_at),
         "updated_at": isoformat(door.updated_at),
     }

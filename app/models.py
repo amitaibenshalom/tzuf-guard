@@ -53,6 +53,8 @@ class Door(TimestampMixin, db.Model):
     status_changed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_seen_at = db.Column(db.DateTime(timezone=True), nullable=True)
     device_name = db.Column(db.String(120), nullable=True)
+    notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    is_pinned = db.Column(db.Boolean, default=False, nullable=False)
 
     user = db.relationship("User", back_populates="doors")
     events = db.relationship(

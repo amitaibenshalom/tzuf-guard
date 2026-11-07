@@ -59,6 +59,13 @@ def int_field(data, name, required=False, min_value=None, max_value=None):
     return value
 
 
+def boolean_field(data, name):
+    value = data.get(name)
+    if not isinstance(value, bool):
+        raise ApiError(f"'{name}' must be a boolean.", 400, "validation_error")
+    return value
+
+
 def validate_status(status):
     if status not in VALID_STATUSES:
         raise ApiError(

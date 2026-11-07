@@ -453,8 +453,53 @@ def test_create_door(client, auth):
     assert response.status_code == 201
     door = response.get_json()["door"]
     assert door["name"] == "Front Door"
+    assert door["notifications_enabled"] is True
+    assert door["is_pinned"] is False
     assert "token" not in door
     assert "token_hash" not in door
+
+
+def test_door_preferences_can_be_updated_and_pins_sort_first(client, auth):
+    first = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "First", "token": "first-door-preference-token"},
+    ).get_json()["door"]
+    second = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Second", "token": "second-door-preference-token"},
+    ).get_json()["door"]
+
+    updated = client.patch(
+        f"/api/doors/{second['id']}",
+        headers=auth,
+        json={"is_pinned": True, "notifications_enabled": False},
+    )
+
+    assert updated.status_code == 200
+    door = updated.get_json()["door"]
+    assert door["is_pinned"] is True
+    assert door["notifications_enabled"] is False
+    listed = client.get("/api/doors", headers=auth).get_json()["doors"]
+    assert [item["id"] for item in listed] == [second["id"], first["id"]]
+
+
+def test_door_preferences_require_booleans(client, auth):
+    door = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Front", "token": "invalid-preference-token"},
+    ).get_json()["door"]
+
+    response = client.patch(
+        f"/api/doors/{door['id']}",
+        headers=auth,
+        json={"is_pinned": "yes"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "validation_error"
 
 
 def test_create_door_generates_one_time_word_phrase(client, auth):
@@ -995,6 +1040,42 @@ def test_status_change_sends_expo_push(client, auth, monkeypatch):
     assert kwargs["json"]["sound"] == "default"
     assert kwargs["json"]["priority"] == "high"
     assert kwargs["timeout"] == 10
+
+
+def test_status_change_skips_push_when_door_notifications_are_disabled(
+    client, auth, monkeypatch
+):
+    sent = []
+    monkeypatch.setattr(
+        "app.services.notifications.requests.post",
+        lambda *args, **kwargs: sent.append((args, kwargs)),
+    )
+    client.post(
+        "/api/push-devices",
+        headers=auth,
+        json={
+            "platform": "android",
+            "push_token": "ExponentPushToken[valid-token]",
+        },
+    )
+    door = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Quiet Door", "token": "quiet-door-token-12345"},
+    ).get_json()["door"]
+    client.patch(
+        f"/api/doors/{door['id']}",
+        headers=auth,
+        json={"notifications_enabled": False},
+    )
+
+    response = client.post(
+        "/api/door-status",
+        json={"token": "quiet-door-token-12345", "status": "opened"},
+    )
+
+    assert response.status_code == 200
+    assert sent == []
 
 
 def test_status_change_closed_uses_safe_emoji(client, auth, monkeypatch):

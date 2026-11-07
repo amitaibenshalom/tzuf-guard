@@ -7,7 +7,7 @@ from app.models import Door, DoorEvent
 from app.security import generate_door_token, hash_door_token
 from app.serializers import door_event_to_dict, door_to_dict
 from app.services.doors import create_door_for_user
-from app.validation import require_json, string_field
+from app.validation import boolean_field, require_json, string_field
 from .common import current_user_required
 
 doors_bp = Blueprint("doors", __name__)
@@ -40,7 +40,11 @@ def create_door(current_user):
 @doors_bp.get("")
 @current_user_required
 def list_doors(current_user):
-    doors = Door.query.filter_by(user_id=current_user.id).order_by(Door.created_at).all()
+    doors = (
+        Door.query.filter_by(user_id=current_user.id)
+        .order_by(Door.is_pinned.desc(), Door.created_at.asc())
+        .all()
+    )
     return jsonify({"doors": [door_to_dict(door) for door in doors]})
 
 
@@ -98,6 +102,10 @@ def patch_door(current_user, door_id):
     if "token" in data:
         token = string_field(data, "token", min_length=16, max_length=255)
         door.token_hash = hash_door_token(token)
+    if "notifications_enabled" in data:
+        door.notifications_enabled = boolean_field(data, "notifications_enabled")
+    if "is_pinned" in data:
+        door.is_pinned = boolean_field(data, "is_pinned")
 
     try:
         db.session.commit()
