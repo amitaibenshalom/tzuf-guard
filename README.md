@@ -22,6 +22,7 @@ phrases, live status, editing, deletion, and paginated state-change history.
 tzuf-guard/
 ├── api/index.py          # Vercel Python entrypoint
 ├── app/                  # Flask package, API, services, and static web assets
+├── firmware/             # authenticated ESP32 OTA releases
 ├── migrations/           # Alembic migrations
 ├── public/               # CSS and JavaScript served by Vercel's CDN
 ├── templates/            # web application shell
@@ -141,6 +142,7 @@ Doors:
 Device:
 
 - `POST /api/door-status`
+- `GET /api/firmware/<model>` — authenticated sensor firmware update
 
 Push:
 
@@ -163,6 +165,18 @@ Every report refreshes the door's current status and last-seen time. History is
 created only when the status changes, so reconnects and repeated reports do not
 pollute the activity timeline.
 
+## Firmware releases
+
+The OTA endpoint authenticates each ESP32 with its door setup phrase and serves
+only a newer semantic version. Release manifests live in `firmware/` beside the
+binary and include its MD5, SHA-256, and exact byte size; the endpoint validates
+all three before serving a release. Keeping these files outside `public/`
+ensures the binary is available only through the authenticated API.
+
+Build and package releases from the hardware repository as described in its
+README. Deploying a new server commit makes the release available; no database
+migration or new environment variable is required.
+
 ## Security Notes
 
 - Passwords are hashed.
@@ -172,6 +186,7 @@ pollute the activity timeline.
   retrieved later because only its hash is stored.
 - API responses never expose stored token hashes or password hashes.
 - Users can only access their own doors.
+- Firmware downloads require a valid door setup phrase and use an integrity-checked release manifest.
 - Door pinning and per-door notification preferences are stored with each door, so they remain consistent across clients.
 - Ably API keys remain server-only. Browser and mobile clients receive short-lived JWTs scoped to their own private channel with subscribe-only capability.
 - The homepage demo uses a separate public channel whose payload contains only the same safe status fields exposed by the public demo endpoint.

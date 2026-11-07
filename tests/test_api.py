@@ -1,3 +1,4 @@
+import hashlib
 import json
 from datetime import timedelta
 
@@ -586,6 +587,69 @@ def test_esp32_status_update_success(client, auth):
     assert body["event"]["received_at"].endswith("+00:00")
     assert "battery_mv" not in body["door"]
     assert "battery_mv" not in body["event"]
+
+
+def test_firmware_download_is_authenticated_versioned_and_checksummed(
+    client, auth, app, tmp_path
+):
+    token = "firmware-device-token"
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "OTA Door", "token": token},
+    )
+    binary = b"\xe9test-firmware-image"
+    checksum = hashlib.md5(binary, usedforsecurity=False).hexdigest()
+    sha256 = hashlib.sha256(binary).hexdigest()
+    (tmp_path / "tzufguard-esp32-c3.bin").write_bytes(binary)
+    (tmp_path / "esp32-c3.json").write_text(
+        json.dumps(
+            {
+                "model": "esp32-c3",
+                "version": "1.2.0",
+                "filename": "tzufguard-esp32-c3.bin",
+                "md5": checksum,
+                "sha256": sha256,
+                "size": len(binary),
+            }
+        ),
+        encoding="utf-8",
+    )
+    app.config["FIRMWARE_DIRECTORY"] = str(tmp_path)
+
+    response = client.get(
+        "/api/firmware/esp32-c3",
+        headers={
+            "X-TzufGuard-Token": token,
+            "X-ESP32-Version": "1.1.0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.data == binary
+    assert response.headers["X-MD5"] == checksum
+    assert response.headers["X-Firmware-Version"] == "1.2.0"
+    assert response.headers["Cache-Control"] == "no-store"
+
+    current = client.get(
+        "/api/firmware/esp32-c3",
+        headers={
+            "X-TzufGuard-Token": token,
+            "X-ESP32-Version": "1.2.0",
+        },
+    )
+    assert current.status_code == 304
+
+
+def test_firmware_download_rejects_unknown_device(client, app, tmp_path):
+    app.config["FIRMWARE_DIRECTORY"] = str(tmp_path)
+    response = client.get(
+        "/api/firmware/esp32-c3",
+        headers={"X-TzufGuard-Token": "unknown-firmware-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "firmware_forbidden"
 
 
 def test_realtime_token_is_private_and_subscribe_only(client, auth, app):

@@ -63,6 +63,8 @@ class Config:
     NOTIFICATIONS_ENABLED = bool_from_env("NOTIFICATIONS_ENABLED", default=True)
     ABLY_API_KEY = os.getenv("ABLY_API_KEY", "").strip()
     ABLY_TOKEN_TTL_SECONDS = int(os.getenv("ABLY_TOKEN_TTL_SECONDS", "3600"))
+    FIRMWARE_DIRECTORY = str(BASE_DIR / "firmware")
+    FIRMWARE_MODELS = {"esp32-c3"}
     PUBLIC_DEMO_DOOR_ID = os.getenv("PUBLIC_DEMO_DOOR_ID", "").strip()
     PUBLIC_DEMO_DOOR_LABEL = os.getenv(
         "PUBLIC_DEMO_DOOR_LABEL", "Amitai's door"

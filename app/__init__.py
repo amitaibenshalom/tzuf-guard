@@ -7,6 +7,7 @@ from .extensions import db, jwt, migrate
 from .routes.auth import auth_bp
 from .routes.device_status import device_status_bp
 from .routes.doors import doors_bp
+from .routes.firmware import firmware_bp
 from .routes.me import me_bp
 from .routes.push_devices import push_devices_bp
 from .routes.public_demo import public_demo_bp
@@ -44,6 +45,7 @@ def register_routes(app):
     app.register_blueprint(me_bp, url_prefix="/api")
     app.register_blueprint(doors_bp, url_prefix="/api/doors")
     app.register_blueprint(device_status_bp, url_prefix="/api")
+    app.register_blueprint(firmware_bp, url_prefix="/api/firmware")
     app.register_blueprint(push_devices_bp, url_prefix="/api/push-devices")
     app.register_blueprint(public_demo_bp, url_prefix="/api/public")
     app.register_blueprint(realtime_bp, url_prefix="/api/realtime")
