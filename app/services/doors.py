@@ -4,6 +4,10 @@ from app.errors import ApiError
 from app.extensions import db
 from app.models import Door, DoorEvent, utcnow
 from app.security import hash_door_token
+from app.services.device_health import (
+    publish_contact_transitions,
+    record_device_contact,
+)
 from app.services.notifications import notification_service
 from app.services.realtime import realtime_service
 
@@ -26,7 +30,7 @@ def create_door_for_user(user, name, token, location=None):
     return door
 
 
-def update_door_status(token, status, device_name=None):
+def update_door_status(token, status, device_name=None, firmware_version=None):
     door = Door.query.filter_by(token_hash=hash_door_token(token)).first()
     if door is None:
         raise ApiError("Unknown door token.", 404, "unknown_door_token")
@@ -34,10 +38,14 @@ def update_door_status(token, status, device_name=None):
     previous_status = door.last_status
     status_changed = previous_status != status
     received_at = utcnow()
+    transitions = record_device_contact(
+        door,
+        device_name=device_name,
+        firmware_version=firmware_version,
+        received_at=received_at,
+    )
 
     door.last_status = status
-    door.last_seen_at = received_at
-    door.device_name = device_name
 
     event = None
     if status_changed:
@@ -54,5 +62,6 @@ def update_door_status(token, status, device_name=None):
     if status_changed:
         realtime_service.publish_door_status_changed(door, event)
         notification_service.send_door_status_changed(door, previous_status)
+    publish_contact_transitions(door, transitions)
 
     return door, event, status_changed

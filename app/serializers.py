@@ -1,5 +1,7 @@
 from datetime import timezone
 
+from app.device_state import door_is_online
+
 
 def isoformat(value):
     if value is None:
@@ -30,7 +32,13 @@ def door_to_dict(door, include_events=False, events=None):
         "last_status": door.last_status,
         "status_changed_at": isoformat(door.status_changed_at),
         "last_seen_at": isoformat(door.last_seen_at),
+        "last_heartbeat_at": isoformat(door.last_heartbeat_at),
+        "is_online": door_is_online(door),
+        "offline_since": isoformat(door.offline_since),
         "device_name": door.device_name,
+        "firmware_version": door.firmware_version,
+        "firmware_update_requested_at": isoformat(door.firmware_update_requested_at),
+        "firmware_update_target_version": door.firmware_update_target_version,
         "notifications_enabled": door.notifications_enabled,
         "is_pinned": door.is_pinned,
         "created_at": isoformat(door.created_at),

@@ -47,6 +47,7 @@ CORS_ORIGINS=https://your-domain.example
 NOTIFICATIONS_ENABLED=true
 ABLY_API_KEY=<server-only Ably API key with publish and subscribe capability>
 ABLY_TOKEN_TTL_SECONDS=3600
+CRON_SECRET=<strong random secret, at least 32 chars>
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
@@ -142,7 +143,12 @@ Doors:
 Device:
 
 - `POST /api/door-status`
+- `POST /api/device/heartbeat` — records sensor health and returns queued commands
 - `GET /api/firmware/<model>` — authenticated sensor firmware update
+
+Device management:
+
+- `POST /api/doors/<id>/firmware-update` — queues the latest release for a sensor
 
 Push:
 
@@ -164,6 +170,11 @@ The sensor uses only the per-door setup phrase when posting `/api/door-status`.
 Every report refreshes the door's current status and last-seen time. History is
 created only when the status changes, so reconnects and repeated reports do not
 pollute the activity timeline.
+
+Sensors send a heartbeat every five minutes. The secured Vercel cron route runs
+on the same interval and marks a sensor offline after two missed heartbeats (10
+minutes). Offline transitions publish one realtime update and one push alert;
+normal heartbeats do not publish messages or create history entries.
 
 ## Firmware releases
 

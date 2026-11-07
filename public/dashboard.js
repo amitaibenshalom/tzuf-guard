@@ -4,6 +4,8 @@ import {
 } from "/common.js";
 
 const DOOR_STATUS_EVENT = "door.status.changed";
+const DOOR_HEALTH_EVENT = "door.health.changed";
+const DOOR_DEVICE_EVENT = "door.device.changed";
 
 if (!hasSession()) location.replace("/login?next=%2Fapp%2Fdoors");
 
@@ -46,15 +48,15 @@ function closeDialog(dialog) {
 }
 
 function renderSummary() {
-    const opened = state.doors.filter(door => door.last_status === "opened").length;
-    const closed = state.doors.filter(door => door.last_status === "closed").length;
-    const waiting = state.doors.length - opened - closed;
+    const opened = state.doors.filter(door => door.is_online && door.last_status === "opened").length;
+    const closed = state.doors.filter(door => door.is_online && door.last_status === "closed").length;
+    const offline = state.doors.filter(door => !door.is_online).length;
     $("#summary").innerHTML = `
         <div class="door-overview__total"><span>Monitored entrances</span><strong>${state.doors.length}</strong></div>
         <div class="door-overview__states">
             <div><i class="state-dot state-dot--open"></i><strong>${opened}</strong><span>Open now</span></div>
             <div><i class="state-dot state-dot--closed"></i><strong>${closed}</strong><span>Closed now</span></div>
-            <div><i class="state-dot state-dot--waiting"></i><strong>${waiting}</strong><span>Waiting</span></div>
+            <div><i class="state-dot state-dot--offline"></i><strong>${offline}</strong><span>Offline</span></div>
         </div>`;
 }
 
@@ -68,13 +70,13 @@ function renderDoors() {
     emptyState.classList.add("hidden");
     doorGrid.classList.remove("hidden");
     doorGrid.innerHTML = state.doors.map(door => {
-        const status = statusMeta(door.last_status);
+        const status = statusMeta(door.last_status, door.is_online);
         const location = door.location ? `${icon("pin")}${escapeHtml(door.location)}` : "No location set";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
                 <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}</div>
                 <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location}</p>
-                <p class="door-seen">${icon("clock")}<span>${escapeHtml(relativeTime(door.last_seen_at))}</span></p>
+                <p class="door-seen">${icon(door.is_online ? "wifi" : "offline")}<span>${door.is_online ? "Sensor online" : `Last seen ${escapeHtml(relativeTime(door.last_seen_at))}`}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
             </button>
             <div class="door-card__actions">
@@ -151,8 +153,15 @@ async function saveDoor(event) {
 }
 
 function renderDetailStatus(door) {
-    const status = statusMeta(door.last_status);
-    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>Last report: ${escapeHtml(formatDate(door.last_seen_at))}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    const status = statusMeta(door.last_status, door.is_online);
+    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>${door.is_online ? "Last report" : "Last sensor contact"}: ${escapeHtml(formatDate(door.last_seen_at))}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    const offlineAlert = $("#detail-offline-alert");
+    offlineAlert.classList.toggle("hidden", door.is_online);
+    offlineAlert.innerHTML = door.is_online ? "" : `${icon("offline")}<div><strong>Sensor offline</strong><span>Check its power cable and Wi-Fi connection.</span></div>`;
+    $("#detail-firmware-version").textContent = door.firmware_version ? `Version ${door.firmware_version}` : "Version will appear after the next heartbeat";
+    const queue = $("#detail-firmware-queue");
+    queue.classList.toggle("hidden", !door.firmware_update_requested_at);
+    queue.textContent = door.firmware_update_requested_at ? `Version ${door.firmware_update_target_version} queued` : "";
     updateDurationCounters();
 }
 
@@ -264,6 +273,8 @@ function stopRealtime() {
     const realtime = state.realtime;
     if (!realtime) return;
     realtime.channel.unsubscribe(DOOR_STATUS_EVENT, realtime.onMessage);
+    realtime.channel.unsubscribe(DOOR_HEALTH_EVENT, realtime.onMessage);
+    realtime.channel.unsubscribe(DOOR_DEVICE_EVENT, realtime.onMessage);
     realtime.channel.off("attached", realtime.onAttached);
     realtime.channel.off("update", realtime.onUpdate);
     realtime.client.connection.off("failed", realtime.onFailed);
@@ -317,7 +328,36 @@ async function startRealtime() {
     channel.on("attached", realtime.onAttached);
     channel.on("update", realtime.onUpdate);
     client.connection.on("failed", realtime.onFailed);
-    await channel.subscribe(DOOR_STATUS_EVENT, realtime.onMessage);
+    await Promise.all([
+        channel.subscribe(DOOR_STATUS_EVENT, realtime.onMessage),
+        channel.subscribe(DOOR_HEALTH_EVENT, realtime.onMessage),
+        channel.subscribe(DOOR_DEVICE_EVENT, realtime.onMessage),
+    ]);
+}
+
+async function requestFirmwareUpdate() {
+    if (!state.activeDoor) return;
+    const button = $("#firmware-update-button");
+    button.disabled = true;
+    const label = $("span", button);
+    const previousLabel = label.textContent;
+    label.textContent = "Checking…";
+    try {
+        const payload = await api(`/doors/${state.activeDoor.id}/firmware-update`, { method: "POST" });
+        state.activeDoor = { ...state.activeDoor, ...payload.door };
+        const index = state.doors.findIndex(door => door.id === state.activeDoor.id);
+        if (index >= 0) state.doors[index] = { ...state.doors[index], ...payload.door };
+        renderDoors();
+        renderDetailStatus(state.activeDoor);
+        toast(payload.firmware_update.status === "queued"
+            ? `Version ${payload.firmware_update.target_version} queued for the next heartbeat.`
+            : `Firmware ${payload.firmware_update.target_version} is already installed.`);
+    } catch (error) {
+        toast(errorMessage(error));
+    } finally {
+        button.disabled = false;
+        label.textContent = previousLabel;
+    }
 }
 
 function showConfirm(title, copy, buttonText, action) {
@@ -403,6 +443,7 @@ function bindEvents() {
     $("#load-more-events").addEventListener("click", loadMoreEvents);
     $("#confirm-delete-button").addEventListener("click", runConfirmAction);
     $("#regenerate-token").addEventListener("click", confirmRegenerateToken);
+    $("#firmware-update-button").addEventListener("click", requestFirmwareUpdate);
     $$('[data-close]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog"))));
 
     doorGrid.addEventListener("click", event => {

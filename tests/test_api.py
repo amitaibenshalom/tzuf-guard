@@ -296,7 +296,9 @@ def test_public_demo_is_safe_when_unconfigured(client):
     assert response.get_json() == {
         "available": False,
         "duration_seconds": None,
+        "last_seen_seconds": None,
         "label": "Amitai's door",
+        "online": None,
         "status": None,
     }
     assert response.headers["Cache-Control"] == (
@@ -652,6 +654,135 @@ def test_firmware_download_rejects_unknown_device(client, app, tmp_path):
     assert response.get_json()["error"]["code"] == "firmware_forbidden"
 
 
+def test_device_heartbeat_records_health_and_firmware(client, auth):
+    client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Heartbeat Door", "token": "heartbeat-device-token"},
+    )
+
+    response = client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "heartbeat-device-token",
+            "device": "TzufGuard-HEART",
+            "firmware_version": "1.0.0",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["door"]["is_online"] is True
+    assert body["door"]["firmware_version"] == "1.0.0"
+    assert body["door"]["last_heartbeat_at"] is not None
+    assert body["firmware_update_requested"] is False
+    assert body["next_heartbeat_seconds"] == 300
+
+
+def test_firmware_update_request_stays_queued_until_target_reports(
+    client, auth, app
+):
+    created = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "OTA Door", "token": "queued-update-device-token"},
+    ).get_json()["door"]
+    client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "queued-update-device-token",
+            "firmware_version": "0.9.0",
+        },
+    )
+
+    queued = client.post(
+        f"/api/doors/{created['id']}/firmware-update",
+        headers=auth,
+    )
+
+    assert queued.status_code == 202
+    target = queued.get_json()["firmware_update"]["target_version"]
+    assert queued.get_json()["firmware_update"]["status"] == "queued"
+    waiting = client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "queued-update-device-token",
+            "firmware_version": "0.9.0",
+        },
+    ).get_json()
+    assert waiting["firmware_update_requested"] is True
+    assert waiting["firmware_update_target_version"] == target
+
+    completed = client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "queued-update-device-token",
+            "firmware_version": target,
+        },
+    ).get_json()
+    assert completed["firmware_update_requested"] is False
+    assert completed["door"]["firmware_update_requested_at"] is None
+    assert completed["door"]["firmware_update_target_version"] is None
+
+
+def test_health_cron_marks_sensor_offline_once_and_heartbeat_recovers(
+    client, auth, app, monkeypatch
+):
+    health_events = []
+    offline_notifications = []
+    monkeypatch.setattr(
+        "app.services.device_health.realtime_service.publish_door_health_changed",
+        lambda door, health: health_events.append((door.id, health)),
+    )
+    monkeypatch.setattr(
+        "app.services.device_health.notification_service.send_sensor_offline",
+        lambda door: offline_notifications.append(door.id),
+    )
+    created = client.post(
+        "/api/doors",
+        headers=auth,
+        json={"name": "Garage", "token": "offline-heartbeat-token"},
+    ).get_json()["door"]
+    client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "offline-heartbeat-token",
+            "firmware_version": "1.0.0",
+        },
+    )
+    with app.app_context():
+        door = db.session.get(Door, created["id"])
+        door.last_seen_at = utcnow() - timedelta(minutes=11)
+        db.session.commit()
+
+    unauthorized = client.get("/api/internal/device-health")
+    first = client.get(
+        "/api/internal/device-health",
+        headers={"Authorization": f"Bearer {app.config['CRON_SECRET']}"},
+    )
+    second = client.get(
+        "/api/internal/device-health",
+        headers={"Authorization": f"Bearer {app.config['CRON_SECRET']}"},
+    )
+
+    assert unauthorized.status_code == 401
+    assert first.get_json()["newly_offline"] == 1
+    assert second.get_json()["newly_offline"] == 0
+    assert health_events == [(created["id"], "offline")]
+    assert offline_notifications == [created["id"]]
+
+    recovered = client.post(
+        "/api/device/heartbeat",
+        json={
+            "token": "offline-heartbeat-token",
+            "firmware_version": "1.0.0",
+        },
+    )
+    assert recovered.status_code == 200
+    assert recovered.get_json()["door"]["is_online"] is True
+    assert health_events[-1] == (created["id"], "online")
+
+
 def test_realtime_token_is_private_and_subscribe_only(client, auth, app):
     secret = "test-secret-with-at-least-thirty-two-bytes"
     app.config["ABLY_API_KEY"] = f"test-app.test-key:{secret}"
@@ -828,6 +959,8 @@ def test_public_demo_realtime_payload_exposes_only_public_fields(
         "label",
         "status",
         "duration_seconds",
+        "online",
+        "last_seen_seconds",
     }
     assert payload["status"] == "opened"
     assert "Private bedroom" not in payload.values()

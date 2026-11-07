@@ -37,8 +37,18 @@ function renderPublicDemo(payload) {
     const available = payload?.available === true;
     const status = available ? payload.status : null;
     const detail = $("#demo-door-detail");
-    publicDemo.classList.remove("is-loading", "is-open", "is-closed", "is-unavailable");
+    publicDemo.classList.remove("is-loading", "is-open", "is-closed", "is-offline", "is-unavailable");
     $("#demo-door-label").textContent = payload?.label || "Amitai's door";
+
+    if (available && payload.online === false) {
+        publicDemo.classList.add("is-offline");
+        $("#demo-door-status").textContent = "Offline";
+        delete detail.dataset.durationStatus;
+        delete detail.dataset.durationStartedAt;
+        const minutes = Math.max(10, Math.floor(Number(payload.last_seen_seconds || 600) / 60));
+        detail.textContent = `No sensor signal for ${minutes} minutes`;
+        return;
+    }
 
     if (["opened", "closed"].includes(status)) {
         publicDemo.classList.add(status === "opened" ? "is-open" : "is-closed");

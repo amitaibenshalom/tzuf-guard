@@ -40,6 +40,26 @@ class NotificationService:
                 },
             )
 
+    def send_sensor_offline(self, door):
+        if (
+            not current_app.config["NOTIFICATIONS_ENABLED"]
+            or not door.notifications_enabled
+        ):
+            return
+
+        devices = PushDevice.query.filter_by(user_id=door.user_id).all()
+        location = f" in {door.location}" if door.location else ""
+        for device in devices:
+            self.send_push(
+                device,
+                f"{door.name} sensor is offline",
+                f"No signal has been received from {door.name}{location} for 10 minutes.",
+                {
+                    "door_id": str(door.id),
+                    "event": "sensor_offline",
+                },
+            )
+
     def send_push(self, push_device, title, body, data=None):
         token = push_device.push_token
 

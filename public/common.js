@@ -68,7 +68,8 @@ export function setBusy(form, busy, busyText = "Please wait…") {
     button.textContent = busy ? busyText : button.dataset.label;
 }
 
-export function statusMeta(status) {
+export function statusMeta(status, online = true) {
+    if (!online) return { label: "Offline", className: "status--offline" };
     if (status === "opened") return { label: "Open", className: "status--opened" };
     if (status === "closed") return { label: "Closed", className: "status--closed" };
     return { label: "Not connected", className: "status--unknown" };
@@ -110,6 +111,10 @@ export function updateDurationCounters() {
 }
 
 export function durationMarkup(door) {
+    if (!door.is_online) {
+        const lastKnown = door.last_status === "opened" ? "Open" : door.last_status === "closed" ? "Closed" : "Unknown";
+        return `<span class="state-duration">Last known: ${lastKnown}</span>`;
+    }
     if (!["opened", "closed"].includes(door.last_status)) return "";
     if (!door.status_changed_at) return '<span class="state-duration">Duration starts with the next change</span>';
     return `<span class="state-duration" data-duration-status="${door.last_status}" data-duration-started-at="${escapeHtml(door.status_changed_at)}">${escapeHtml(durationText(door.last_status, door.status_changed_at))}</span>`;

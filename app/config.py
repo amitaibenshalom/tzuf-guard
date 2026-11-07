@@ -63,6 +63,9 @@ class Config:
     NOTIFICATIONS_ENABLED = bool_from_env("NOTIFICATIONS_ENABLED", default=True)
     ABLY_API_KEY = os.getenv("ABLY_API_KEY", "").strip()
     ABLY_TOKEN_TTL_SECONDS = int(os.getenv("ABLY_TOKEN_TTL_SECONDS", "3600"))
+    CRON_SECRET = os.getenv("CRON_SECRET", "").strip()
+    DEVICE_HEARTBEAT_INTERVAL_SECONDS = 300
+    DEVICE_OFFLINE_AFTER_SECONDS = 600
     FIRMWARE_DIRECTORY = str(BASE_DIR / "firmware")
     FIRMWARE_MODELS = {"esp32-c3"}
     PUBLIC_DEMO_DOOR_ID = os.getenv("PUBLIC_DEMO_DOOR_ID", "").strip()
@@ -131,6 +134,9 @@ class TestingConfig(Config):
     NOTIFICATIONS_ENABLED = True
     ABLY_API_KEY = ""
     ABLY_TOKEN_TTL_SECONDS = 3600
+    CRON_SECRET = "test-cron-secret-with-at-least-thirty-two-bytes"
+    DEVICE_HEARTBEAT_INTERVAL_SECONDS = 300
+    DEVICE_OFFLINE_AFTER_SECONDS = 600
     PUBLIC_DEMO_DOOR_ID = ""
     PUBLIC_DEMO_DOOR_LABEL = "Amitai's door"
     GOOGLE_OAUTH_CLIENT_IDS = [

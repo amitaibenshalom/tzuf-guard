@@ -3,6 +3,7 @@ from datetime import timezone
 from flask import Blueprint, current_app, jsonify, request
 
 from app.extensions import db
+from app.device_state import door_is_online
 from app.models import Door, utcnow
 from app.services.realtime import realtime_service
 
@@ -18,13 +19,21 @@ def elapsed_seconds(value):
     return max(0, int((utcnow() - value).total_seconds()))
 
 
-def demo_response(available=False, status=None, duration_seconds=None):
+def demo_response(
+    available=False,
+    status=None,
+    duration_seconds=None,
+    online=None,
+    last_seen_seconds=None,
+):
     response = jsonify(
         {
             "available": available,
             "label": current_app.config["PUBLIC_DEMO_DOOR_LABEL"],
             "status": status,
             "duration_seconds": duration_seconds,
+            "online": online,
+            "last_seen_seconds": last_seen_seconds,
         }
     )
     response.headers["Cache-Control"] = (
@@ -54,6 +63,8 @@ def get_demo_door():
         available=True,
         status=status,
         duration_seconds=elapsed_seconds(door.status_changed_at),
+        online=door_is_online(door),
+        last_seen_seconds=elapsed_seconds(door.last_seen_at),
     )
 
 

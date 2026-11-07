@@ -52,7 +52,12 @@ class Door(TimestampMixin, db.Model):
     last_status = db.Column(db.String(16), nullable=True)
     status_changed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_seen_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_heartbeat_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    offline_since = db.Column(db.DateTime(timezone=True), nullable=True)
     device_name = db.Column(db.String(120), nullable=True)
+    firmware_version = db.Column(db.String(32), nullable=True)
+    firmware_update_requested_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    firmware_update_target_version = db.Column(db.String(32), nullable=True)
     notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
 

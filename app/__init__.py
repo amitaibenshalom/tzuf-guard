@@ -9,6 +9,7 @@ from .routes.device_status import device_status_bp
 from .routes.doors import doors_bp
 from .routes.firmware import firmware_bp
 from .routes.me import me_bp
+from .routes.maintenance import maintenance_bp
 from .routes.push_devices import push_devices_bp
 from .routes.public_demo import public_demo_bp
 from .routes.realtime import realtime_bp
@@ -49,6 +50,7 @@ def register_routes(app):
     app.register_blueprint(push_devices_bp, url_prefix="/api/push-devices")
     app.register_blueprint(public_demo_bp, url_prefix="/api/public")
     app.register_blueprint(realtime_bp, url_prefix="/api/realtime")
+    app.register_blueprint(maintenance_bp, url_prefix="/api/internal")
 
     @app.get("/")
     def home():

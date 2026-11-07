@@ -1,8 +1,8 @@
 {
   "model": "esp32-c3",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "filename": "tzufguard-esp32-c3.bin",
-  "md5": "94812ecb505b6a7997fc869545059792",
-  "sha256": "d05703bc4dddeffac1a3141283a36d2d74acfc1ec40f89a959503499d9afb9b1",
-  "size": 1168896
+  "md5": "8028d4bf302955f84e29ebdb7d991842",
+  "sha256": "228233476a808d78c8561d9702350aa1d98316cad56869f6d6e019f0e597285b",
+  "size": 1170848
 }

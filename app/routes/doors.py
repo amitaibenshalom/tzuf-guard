@@ -3,10 +3,12 @@ from sqlalchemy.exc import IntegrityError
 
 from app.errors import ApiError
 from app.extensions import db
-from app.models import Door, DoorEvent
+from app.models import Door, DoorEvent, utcnow
 from app.security import generate_door_token, hash_door_token
 from app.serializers import door_event_to_dict, door_to_dict
 from app.services.doors import create_door_for_user
+from app.services.firmware import load_release, version_key
+from app.services.realtime import realtime_service
 from app.validation import boolean_field, require_json, string_field
 from .common import current_user_required
 
@@ -135,3 +137,46 @@ def regenerate_setup_token(current_user, door_id):
     return jsonify(
         {"door": door_to_dict(door), "provisioning_token": token}
     )
+
+
+@doors_bp.post("/<int:door_id>/firmware-update")
+@current_user_required
+def request_firmware_update(current_user, door_id):
+    door = get_owned_door_or_404(current_user, door_id)
+    release = load_release("esp32-c3")
+    if release is None:
+        raise ApiError(
+            "No firmware release is currently available.",
+            503,
+            "firmware_unavailable",
+        )
+
+    target_version = release["version"]
+    current_version = version_key(door.firmware_version)
+    if current_version is not None and current_version >= version_key(target_version):
+        door.firmware_update_requested_at = None
+        door.firmware_update_target_version = None
+        db.session.commit()
+        return jsonify(
+            {
+                "door": door_to_dict(door),
+                "firmware_update": {
+                    "status": "up_to_date",
+                    "target_version": target_version,
+                },
+            }
+        )
+
+    door.firmware_update_requested_at = utcnow()
+    door.firmware_update_target_version = target_version
+    db.session.commit()
+    realtime_service.publish_door_device_changed(door)
+    return jsonify(
+        {
+            "door": door_to_dict(door),
+            "firmware_update": {
+                "status": "queued",
+                "target_version": target_version,
+            },
+        }
+    ), 202
