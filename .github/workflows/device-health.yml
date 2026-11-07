@@ -21,7 +21,10 @@ jobs:
         env:
           DEVICE_HEALTH_CRON_SECRET: ${{ secrets.DEVICE_HEALTH_CRON_SECRET }}
         run: |
-          test -n "$DEVICE_HEALTH_CRON_SECRET"
+          if [ -z "$DEVICE_HEALTH_CRON_SECRET" ]; then
+            echo "::warning::DEVICE_HEALTH_CRON_SECRET is not configured; skipping sweep."
+            exit 0
+          fi
           curl --fail-with-body --silent --show-error \
             --retry 2 \
             --retry-all-errors \
