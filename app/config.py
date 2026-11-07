@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -17,6 +19,15 @@ DEFAULT_GOOGLE_OAUTH_CLIENT_IDS = ",".join(
 DEFAULT_GOOGLE_WEB_CLIENT_ID = (
     "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com"
 )
+DEVICE_HEALTH_CRON_CONTEXT = b"tzufguard-device-health-cron-v1"
+
+
+def derive_device_health_cron_secret(secret_key):
+    return hmac.new(
+        secret_key.encode("utf-8"),
+        DEVICE_HEALTH_CRON_CONTEXT,
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def bool_from_env(name, default=False):
@@ -101,6 +112,10 @@ class Config:
         jwt_secret_key = os.getenv("JWT_SECRET_KEY", secret_key).strip()
         app.config["SECRET_KEY"] = secret_key
         app.config["JWT_SECRET_KEY"] = jwt_secret_key
+        app.config["CRON_SECRET"] = (
+            os.getenv("CRON_SECRET", "").strip()
+            or derive_device_health_cron_secret(secret_key)
+        )
         app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(
             seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_SECONDS", "2592000"))
         )

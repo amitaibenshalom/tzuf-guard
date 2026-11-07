@@ -47,7 +47,8 @@ CORS_ORIGINS=https://your-domain.example
 NOTIFICATIONS_ENABLED=true
 ABLY_API_KEY=<server-only Ably API key with publish and subscribe capability>
 ABLY_TOKEN_TTL_SECONDS=3600
-CRON_SECRET=<strong random secret, at least 32 chars>
+# Optional; a dedicated health-check secret is derived from SECRET_KEY when omitted.
+CRON_SECRET=
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
@@ -171,10 +172,13 @@ Every report refreshes the door's current status and last-seen time. History is
 created only when the status changes, so reconnects and repeated reports do not
 pollute the activity timeline.
 
-Sensors send a heartbeat every five minutes. The secured Vercel cron route runs
-on the same interval and marks a sensor offline after two missed heartbeats (10
-minutes). Offline transitions publish one realtime update and one push alert;
-normal heartbeats do not publish messages or create history entries.
+Sensors send a heartbeat every five minutes. The secured GitHub Actions health
+sweep runs on the same interval and marks a sensor offline after two missed
+heartbeats (10 minutes). Offline transitions publish one realtime update and
+one push alert; normal heartbeats do not publish messages or create history
+entries. The workflow secret `DEVICE_HEALTH_CRON_SECRET` must match
+`CRON_SECRET`, or the dedicated value derived from `SECRET_KEY` when the
+Vercel override is omitted.
 
 ## Firmware releases
 

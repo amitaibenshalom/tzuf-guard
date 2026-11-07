@@ -1,0 +1,30 @@
+name: Device health sweep
+
+on:
+  schedule:
+    # Offset from the top of the hour to reduce peak-time scheduling delays.
+    - cron: "2-57/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: device-health-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Mark stale sensors offline
+        env:
+          DEVICE_HEALTH_CRON_SECRET: ${{ secrets.DEVICE_HEALTH_CRON_SECRET }}
+        run: |
+          test -n "$DEVICE_HEALTH_CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --retry-all-errors \
+            --max-time 30 \
+            -H "Authorization: Bearer $DEVICE_HEALTH_CRON_SECRET" \
+            https://amitaibenshalom.com/api/internal/device-health
