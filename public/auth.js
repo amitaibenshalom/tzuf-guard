@@ -5,6 +5,25 @@ if (hasSession()) location.replace(safeNextPath());
 const form = $("#auth-form");
 const errorNode = $("#auth-error");
 const mode = document.body.dataset.authMode;
+const LOGIN_EMAIL_KEY = "tzufguard_login_email";
+
+function showAuthError(error) {
+    errorNode.replaceChildren(document.createTextNode(errorMessage(error)));
+    if (error.code === "duplicate_email" && mode === "register") {
+        sessionStorage.setItem(LOGIN_EMAIL_KEY, form.elements.email.value.trim());
+        const loginLink = document.createElement("a");
+        loginLink.href = "/login";
+        loginLink.textContent = " Log in instead.";
+        errorNode.append(loginLink);
+    } else if (error.code === "google_link_requires_password") {
+        const loginLink = document.createElement("a");
+        const email = form.elements.email?.value.trim();
+        if (email) sessionStorage.setItem(LOGIN_EMAIL_KEY, email);
+        loginLink.href = "/login";
+        loginLink.textContent = " Go to email login.";
+        errorNode.append(loginLink);
+    }
+}
 
 function toast(message) {
     const element = $("#toast");
@@ -38,7 +57,7 @@ form.addEventListener("submit", async event => {
         });
         await completeAuthentication(payload);
     } catch (error) {
-        errorNode.textContent = errorMessage(error);
+        showAuthError(error);
     } finally {
         setBusy(form, false);
     }
@@ -63,7 +82,7 @@ function initGoogle(attempt = 0) {
                 });
                 await completeAuthentication(payload);
             } catch (error) {
-                errorNode.textContent = errorMessage(error);
+                showAuthError(error);
             }
         },
     });
@@ -102,3 +121,10 @@ if (forgotButton && forgotForm) {
 $$('[data-close]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog"))));
 if (new URLSearchParams(location.search).has("expired")) errorNode.textContent = "Your session expired. Log in again to continue.";
 initGoogle();
+if (mode === "login") {
+    const email = sessionStorage.getItem(LOGIN_EMAIL_KEY);
+    if (email) {
+        form.elements.email.value = email;
+        sessionStorage.removeItem(LOGIN_EMAIL_KEY);
+    }
+}

@@ -1,7 +1,10 @@
+import re
+
 from .errors import ApiError
 
 VALID_STATUSES = {"opened", "closed"}
 VALID_PUSH_PLATFORMS = {"android", "ios", "expo", "web"}
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def require_json(request):
@@ -37,6 +40,13 @@ def string_field(data, name, required=True, min_length=1, max_length=255):
             "validation_error",
         )
     return value or None
+
+
+def email_field(data, name="email"):
+    value = string_field(data, name, max_length=255)
+    if not EMAIL_PATTERN.fullmatch(value):
+        raise ApiError("Enter a valid email address.", 400, "invalid_email")
+    return value
 
 
 def int_field(data, name, required=False, min_value=None, max_value=None):

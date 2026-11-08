@@ -11,7 +11,7 @@ from app.security import generate_secure_token, hash_reset_token, normalize_emai
 from app.serializers import user_to_dict
 from app.services.email import email_service
 from app.services.google_auth import verify_google_id_token
-from app.validation import require_json, string_field
+from app.validation import email_field, require_json, string_field
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -19,9 +19,16 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.post("/register")
 def register():
     data = require_json(request)
-    email = normalize_email(string_field(data, "email", max_length=255))
+    email = normalize_email(email_field(data))
     password = string_field(data, "password", min_length=8, max_length=128)
     name = string_field(data, "name", max_length=120)
+
+    if User.query.filter_by(email=email).first() is not None:
+        raise ApiError(
+            "An account already uses this email. Log in, or continue with Google if that is how you signed up.",
+            409,
+            "duplicate_email",
+        )
 
     user = User(email=email, name=name)
     user.set_password(password)
@@ -31,7 +38,11 @@ def register():
         db.session.commit()
     except IntegrityError as exc:
         db.session.rollback()
-        raise ApiError("Email is already registered.", 409, "duplicate_email") from exc
+        raise ApiError(
+            "An account already uses this email. Log in, or continue with Google if that is how you signed up.",
+            409,
+            "duplicate_email",
+        ) from exc
 
     token = create_access_token(identity=str(user.id))
     return jsonify({"user": user_to_dict(user), "access_token": token}), 201
@@ -40,12 +51,16 @@ def register():
 @auth_bp.post("/login")
 def login():
     data = require_json(request)
-    email = normalize_email(string_field(data, "email", max_length=255))
+    email = normalize_email(email_field(data))
     password = string_field(data, "password", max_length=128)
 
     user = User.query.filter_by(email=email).first()
     if user is None or not user.check_password(password):
-        raise ApiError("Invalid email or password.", 401, "invalid_credentials")
+        raise ApiError(
+            "Invalid email or password. If you signed up with Google, choose Continue with Google.",
+            401,
+            "invalid_credentials",
+        )
 
     token = create_access_token(identity=str(user.id))
     return jsonify({"user": user_to_dict(user), "access_token": token})
@@ -125,7 +140,7 @@ def _google_is_authoritative_for_email(claims, email):
 @auth_bp.post("/forgot-password")
 def forgot_password():
     data = require_json(request)
-    email = normalize_email(string_field(data, "email", max_length=255))
+    email = normalize_email(email_field(data))
     user = User.query.filter_by(email=email).first()
 
     if user is not None:

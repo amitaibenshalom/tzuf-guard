@@ -50,13 +50,15 @@ function closeDialog(dialog) {
 function renderSummary() {
     const opened = state.doors.filter(door => door.is_online && door.last_status === "opened").length;
     const closed = state.doors.filter(door => door.is_online && door.last_status === "closed").length;
-    const offline = state.doors.filter(door => !door.is_online).length;
+    const offline = state.doors.filter(door => door.last_seen_at && !door.is_online).length;
+    const waiting = state.doors.filter(door => !door.last_seen_at).length;
     $("#summary").innerHTML = `
         <div class="door-overview__total"><span>Monitored entrances</span><strong>${state.doors.length}</strong></div>
-        <div class="door-overview__states">
+        <div class="door-overview__states${waiting ? " door-overview__states--waiting" : ""}">
             <div><i class="state-dot state-dot--open"></i><strong>${opened}</strong><span>Open now</span></div>
             <div><i class="state-dot state-dot--closed"></i><strong>${closed}</strong><span>Closed now</span></div>
             <div><i class="state-dot state-dot--offline"></i><strong>${offline}</strong><span>Offline</span></div>
+            ${waiting ? `<div><i class="state-dot state-dot--waiting"></i><strong>${waiting}</strong><span>Waiting</span></div>` : ""}
         </div>`;
 }
 
@@ -70,13 +72,15 @@ function renderDoors() {
     emptyState.classList.add("hidden");
     doorGrid.classList.remove("hidden");
     doorGrid.innerHTML = state.doors.map(door => {
-        const status = statusMeta(door.last_status, door.is_online);
+        const hasReported = Boolean(door.last_seen_at);
+        const status = statusMeta(door.last_status, door.is_online, hasReported);
         const location = door.location ? `${icon("pin")}${escapeHtml(door.location)}` : "No location set";
+        const sensorLabel = !hasReported ? "Waiting for first report" : door.is_online ? "Sensor online" : `Last seen ${escapeHtml(relativeTime(door.last_seen_at))}`;
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
                 <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}</div>
                 <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location}</p>
-                <p class="door-seen">${icon(door.is_online ? "wifi" : "offline")}<span>${door.is_online ? "Sensor online" : `Last seen ${escapeHtml(relativeTime(door.last_seen_at))}`}</span></p>
+                <p class="door-seen">${icon(!hasReported ? "clock" : door.is_online ? "wifi" : "offline")}<span>${sensorLabel}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
             </button>
             <div class="door-card__actions">
@@ -153,11 +157,14 @@ async function saveDoor(event) {
 }
 
 function renderDetailStatus(door) {
-    const status = statusMeta(door.last_status, door.is_online);
-    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>${door.is_online ? "Last report" : "Last sensor contact"}: ${escapeHtml(formatDate(door.last_seen_at))}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    const hasReported = Boolean(door.last_seen_at);
+    const status = statusMeta(door.last_status, door.is_online, hasReported);
+    const reportLabel = !hasReported ? "Waiting for the first sensor report" : `${door.is_online ? "Last report" : "Last sensor contact"}: ${escapeHtml(formatDate(door.last_seen_at))}`;
+    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>${reportLabel}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
     const offlineAlert = $("#detail-offline-alert");
-    offlineAlert.classList.toggle("hidden", door.is_online);
-    offlineAlert.innerHTML = door.is_online ? "" : `${icon("offline")}<div><strong>Sensor offline</strong><span>Check its power cable and Wi-Fi connection.</span></div>`;
+    const isOffline = hasReported && !door.is_online;
+    offlineAlert.classList.toggle("hidden", !isOffline);
+    offlineAlert.innerHTML = isOffline ? `${icon("offline")}<div><strong>Sensor offline</strong><span>Check its power cable and Wi-Fi connection.</span></div>` : "";
     $("#detail-firmware-version").textContent = door.firmware_version ? `Version ${door.firmware_version}` : "Version will appear after the next heartbeat";
     const queue = $("#detail-firmware-queue");
     queue.classList.toggle("hidden", !door.firmware_update_requested_at);
@@ -434,6 +441,35 @@ function bindEvents() {
         clearSession();
         location.assign("/");
     });
+    const deleteAccountDialog = $("#delete-account-dialog");
+    const deleteAccountForm = $("#delete-account-form");
+    $("#delete-account-open").addEventListener("click", () => {
+        $("#account-menu").open = false;
+        $("#delete-account-email").textContent = state.user?.email || "your account email";
+        deleteAccountForm.reset();
+        $("[data-form-error]", deleteAccountForm).textContent = "";
+        openDialog(deleteAccountDialog);
+        setTimeout(() => $("#delete-account-confirmation").focus(), 50);
+    });
+    deleteAccountForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        const errorNode = $("[data-form-error]", deleteAccountForm);
+        errorNode.textContent = "";
+        setBusy(deleteAccountForm, true, "Deleting…");
+        try {
+            await api("/me", {
+                method: "DELETE",
+                body: JSON.stringify({ confirmation_email: deleteAccountForm.elements.confirmation_email.value }),
+            });
+            stopRealtime();
+            clearSession();
+            location.assign("/");
+        } catch (error) {
+            errorNode.textContent = errorMessage(error);
+        } finally {
+            setBusy(deleteAccountForm, false);
+        }
+    });
     $("#add-door-button").addEventListener("click", () => openDoorForm());
     $("[data-action='add-door']").addEventListener("click", () => openDoorForm());
     $("#retry-doors").addEventListener("click", () => loadDoors());
@@ -473,7 +509,8 @@ async function initialize() {
     try {
         const payload = await api("/me");
         state.user = payload.user;
-        $("#user-greeting").textContent = state.user?.name || state.user?.email || "";
+        $("#user-greeting").textContent = state.user?.name || state.user?.email || "Account";
+        $("#user-avatar").textContent = (state.user?.name || state.user?.email || "A").charAt(0).toUpperCase();
         await loadDoors();
         startRealtime().catch(error => {
             console.error("Realtime updates are unavailable:", errorMessage(error));
@@ -485,6 +522,13 @@ async function initialize() {
 
 initialize();
 setInterval(updateDurationCounters, 1000);
+document.addEventListener("click", event => {
+    const menu = $("#account-menu");
+    if (menu.open && !menu.contains(event.target)) menu.open = false;
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") $("#account-menu").open = false;
+});
 document.addEventListener("visibilitychange", () => {
     if (!document.hidden && hasSession()) resyncRealtimeState();
 });

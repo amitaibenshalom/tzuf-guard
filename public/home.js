@@ -40,7 +40,7 @@ function renderPublicDemo(payload) {
     publicDemo.classList.remove("is-loading", "is-open", "is-closed", "is-offline", "is-unavailable");
     $("#demo-door-label").textContent = payload?.label || "Amitai's door";
 
-    if (available && payload.online === false) {
+    if (available && payload.online === false && payload.last_seen_seconds !== null && payload.last_seen_seconds !== undefined) {
         publicDemo.classList.add("is-offline");
         $("#demo-door-status").textContent = "Offline";
         delete detail.dataset.durationStatus;
@@ -50,7 +50,7 @@ function renderPublicDemo(payload) {
         return;
     }
 
-    if (["opened", "closed"].includes(status)) {
+    if (payload?.last_seen_seconds !== null && payload?.last_seen_seconds !== undefined && ["opened", "closed"].includes(status)) {
         publicDemo.classList.add(status === "opened" ? "is-open" : "is-closed");
         $("#demo-door-status").textContent = status === "opened" ? "Open" : "Closed";
         setDurationCounter(detail, status, durationStartedAt(payload.duration_seconds));
