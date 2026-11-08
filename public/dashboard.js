@@ -13,6 +13,8 @@ const state = {
     user: null,
     doors: [],
     activeDoor: null,
+    sharingDoor: null,
+    pendingInvitations: [],
     eventPage: 1,
     events: [],
     hasMoreEvents: false,
@@ -30,6 +32,7 @@ const doorForm = $("#door-form");
 const tokenDialog = $("#token-dialog");
 const detailDialog = $("#door-detail-dialog");
 const confirmDialog = $("#confirm-dialog");
+const sharingDialog = $("#sharing-dialog");
 
 function toast(message) {
     const element = $("#toast");
@@ -76,16 +79,20 @@ function renderDoors() {
         const status = statusMeta(door.last_status, door.is_online, hasReported);
         const location = door.location ? `${icon("pin")}${escapeHtml(door.location)}` : "No location set";
         const sensorLabel = !hasReported ? "Waiting for first report" : door.is_online ? "Sensor online" : `Last seen ${escapeHtml(relativeTime(door.last_seen_at))}`;
+        const sharedBadge = door.access_role === "member"
+            ? `<span class="door-shared-badge">${icon("users")}Shared with you</span>`
+            : door.member_count > 0 ? `<span class="door-shared-badge">${icon("users")}Shared</span>` : "";
+        const actions = door.access_role === "owner" ? `<button class="icon-button" data-action="edit" type="button" aria-label="Edit ${escapeHtml(door.name)}" title="Edit">${icon("edit")}</button>
+                <button class="icon-button icon-button--danger" data-action="delete" type="button" aria-label="Delete ${escapeHtml(door.name)}" title="Delete">${icon("trash")}</button>` : "";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
-                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}</div>
-                <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location}</p>
+                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${door.is_pinned ? `<span class="door-pin">${icon("pin")} Pinned</span>` : ""}${durationMarkup(door)}</span></div>
+                <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location} ${sharedBadge}</p>
                 <p class="door-seen">${icon(!hasReported ? "clock" : door.is_online ? "wifi" : "offline")}<span>${sensorLabel}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
             </button>
             <div class="door-card__actions">
-                <button class="icon-button" data-action="edit" type="button" aria-label="Edit ${escapeHtml(door.name)}" title="Edit">${icon("edit")}</button>
-                <button class="icon-button icon-button--danger" data-action="delete" type="button" aria-label="Delete ${escapeHtml(door.name)}" title="Delete">${icon("trash")}</button>
+                ${actions}
             </div>
         </article>`;
     }).join("");
@@ -110,6 +117,50 @@ async function loadDoors(silent = false) {
         }
     } finally {
         doorLoading.classList.add("hidden");
+    }
+}
+
+function renderPendingInvitations() {
+    const section = $("#pending-invitations");
+    const list = $("#pending-invitation-list");
+    section.classList.toggle("hidden", state.pendingInvitations.length === 0);
+    list.innerHTML = state.pendingInvitations.map(invitation => `
+        <article class="invite-inbox__item" data-invitation-id="${invitation.id}">
+            <div class="invite-inbox__icon">${icon("users")}</div>
+            <div class="invite-inbox__copy"><strong>${escapeHtml(invitation.door_name)}</strong><span>${escapeHtml(invitation.inviter_name)} invited you to monitor this door${invitation.door_location ? ` · ${escapeHtml(invitation.door_location)}` : ""}</span></div>
+            <div class="invite-inbox__actions"><button class="button button--forest button--small" data-invitation-action="accept" type="button">Accept</button><button class="icon-button" data-invitation-action="decline" type="button" aria-label="Dismiss invitation" title="Dismiss">${icon("close")}</button></div>
+        </article>`).join("");
+}
+
+async function loadPendingInvitations() {
+    try {
+        const payload = await api("/invitations/pending");
+        state.pendingInvitations = payload.invitations;
+        renderPendingInvitations();
+    } catch (error) {
+        if (error.status !== 401) console.warn("Could not load door invitations:", errorMessage(error));
+    }
+}
+
+async function handlePendingInvitation(event) {
+    const button = event.target.closest("[data-invitation-action]");
+    const item = event.target.closest("[data-invitation-id]");
+    if (!button || !item) return;
+    const invitationId = Number(item.dataset.invitationId);
+    button.disabled = true;
+    try {
+        if (button.dataset.invitationAction === "accept") {
+            await api(`/invitations/${invitationId}/accept`, { method: "POST" });
+            toast("Door added to your account.");
+            await loadDoors(true);
+        } else {
+            await api(`/invitations/${invitationId}/decline`, { method: "POST" });
+        }
+        state.pendingInvitations = state.pendingInvitations.filter(invitation => invitation.id !== invitationId);
+        renderPendingInvitations();
+    } catch (error) {
+        button.disabled = false;
+        toast(errorMessage(error));
     }
 }
 
@@ -169,7 +220,40 @@ function renderDetailStatus(door) {
     const queue = $("#detail-firmware-queue");
     queue.classList.toggle("hidden", !door.firmware_update_requested_at);
     queue.textContent = door.firmware_update_requested_at ? `Version ${door.firmware_update_target_version} queued` : "";
+    const isOwner = door.access_role === "owner";
+    $("#detail-share").classList.toggle("hidden", !isOwner);
+    $("#detail-leave").classList.toggle("hidden", isOwner);
+    $("#detail-edit").classList.toggle("hidden", !isOwner);
+    $("#detail-delete").classList.toggle("hidden", !isOwner);
+    $("#detail-firmware-panel").classList.toggle("hidden", !isOwner);
+    $("#regenerate-token").classList.toggle("hidden", !isOwner);
+    $("#detail-pin").checked = Boolean(door.is_pinned);
+    $("#detail-notifications").checked = Boolean(door.notifications_enabled);
     updateDurationCounters();
+}
+
+async function updateDoorPreference(field, value) {
+    const door = state.activeDoor;
+    if (!door) return;
+    const previous = Boolean(door[field]);
+    state.activeDoor = { ...door, [field]: value };
+    state.doors = state.doors.map(item => item.id === door.id ? { ...item, [field]: value } : item);
+    renderDoors();
+    try {
+        const result = await api(`/doors/${door.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ [field]: value }),
+        });
+        state.activeDoor = { ...state.activeDoor, ...result.door };
+        state.doors = state.doors.map(item => item.id === door.id ? { ...item, ...result.door } : item);
+        renderDoors();
+    } catch (error) {
+        state.activeDoor = { ...state.activeDoor, [field]: previous };
+        state.doors = state.doors.map(item => item.id === door.id ? { ...item, [field]: previous } : item);
+        $(field === "is_pinned" ? "#detail-pin" : "#detail-notifications").checked = previous;
+        renderDoors();
+        toast(errorMessage(error));
+    }
 }
 
 function renderHistory() {
@@ -375,10 +459,110 @@ function showConfirm(title, copy, buttonText, action) {
     openDialog(confirmDialog);
 }
 
+function renderSharing(payload) {
+    const owner = payload.owner;
+    const members = payload.members;
+    const invitations = payload.invitations;
+    $("#sharing-members").innerHTML = [
+        `<div class="sharing-person"><span class="sharing-avatar">${escapeHtml((owner.name || owner.email || "O").charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(owner.name || owner.email)}</strong><span>${escapeHtml(owner.email)} · Owner</span></div></div>`,
+        ...members.map(member => `<div class="sharing-person" data-sharing-member="${member.user_id}"><span class="sharing-avatar">${escapeHtml((member.name || member.email || "M").charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(member.name || member.email)}</strong><span>${escapeHtml(member.email)} · Member</span></div><button class="icon-button icon-button--danger" data-sharing-action="remove-member" data-user-id="${member.user_id}" type="button" aria-label="Remove ${escapeHtml(member.email)}" title="Remove access">${icon("trash")}</button></div>`),
+    ].join("");
+    $("#sharing-invitations").innerHTML = invitations.length
+        ? invitations.map(invitation => `<div class="sharing-person" data-sharing-invitation="${invitation.id}"><span class="sharing-avatar sharing-avatar--pending">${icon("clock")}</span><div><strong>${escapeHtml(invitation.email)}</strong><span>Invited by ${escapeHtml(invitation.inviter_name)} · Expires ${escapeHtml(formatDate(invitation.expires_at))}</span></div><button class="icon-button" data-sharing-action="revoke-invitation" data-invitation-id="${invitation.id}" type="button" aria-label="Cancel invitation to ${escapeHtml(invitation.email)}" title="Cancel invitation">${icon("close")}</button></div>`).join("")
+        : '<p class="sharing-empty">No pending invitations.</p>';
+}
+
+async function openSharing(door) {
+    if (!door || door.access_role !== "owner") return;
+    state.sharingDoor = door;
+    $("#sharing-door-name").textContent = door.name;
+    $("#sharing-form").reset();
+    $("[data-form-error]", $("#sharing-form")).textContent = "";
+    $("#invite-link-fallback").classList.add("hidden");
+    openDialog(sharingDialog);
+    try {
+        const payload = await api(`/doors/${door.id}/sharing`);
+        renderSharing(payload);
+    } catch (error) {
+        toast(errorMessage(error));
+    }
+}
+
+async function sendDoorInvitation(event) {
+    event.preventDefault();
+    if (!state.sharingDoor) return;
+    const form = $("#sharing-form");
+    const errorNode = $("[data-form-error]", form);
+    errorNode.textContent = "";
+    setBusy(form, true, "Sending…");
+    try {
+        const payload = await api(`/doors/${state.sharingDoor.id}/invitations`, {
+            method: "POST",
+            body: JSON.stringify({ email: form.elements.email.value.trim() }),
+        });
+        form.reset();
+        if (payload.email_sent) {
+            toast(`Invitation sent to ${payload.invitation.email}.`);
+            $("#invite-link-fallback").classList.add("hidden");
+        } else {
+            $("#invite-link-value").value = payload.invitation_url;
+            $("#invite-link-fallback").classList.remove("hidden");
+        }
+        renderSharing(await api(`/doors/${state.sharingDoor.id}/sharing`));
+    } catch (error) {
+        errorNode.textContent = errorMessage(error);
+    } finally {
+        setBusy(form, false);
+    }
+}
+
+async function handleSharingAction(event) {
+    const button = event.target.closest("[data-sharing-action]");
+    if (!button || !state.sharingDoor) return;
+    const action = button.dataset.sharingAction;
+    const memberId = Number(button.dataset.userId);
+    const invitationId = Number(button.dataset.invitationId);
+    const isMember = action === "remove-member";
+    const email = button.closest(".sharing-person").querySelector("strong")?.textContent || "this person";
+    showConfirm(
+        isMember ? `Remove ${email}?` : `Cancel invitation to ${email}?`,
+        isMember ? "They will immediately lose access to this door and its history." : "The invitation link will stop working.",
+        isMember ? "Remove access" : "Cancel invitation",
+        async () => {
+            await api(
+                isMember
+                    ? `/doors/${state.sharingDoor.id}/members/${memberId}`
+                    : `/doors/${state.sharingDoor.id}/invitations/${invitationId}`,
+                { method: "DELETE" },
+            );
+            renderSharing(await api(`/doors/${state.sharingDoor.id}/sharing`));
+            toast(isMember ? `${email} no longer has access.` : `Invitation to ${email} cancelled.`);
+        },
+    );
+}
+
+async function leaveSharedDoor() {
+    const door = state.activeDoor;
+    if (!door || door.access_role !== "member") return;
+    showConfirm(
+        `Leave ${door.name}?`,
+        "This door will be removed from your account. The owner can invite you again later.",
+        "Leave door",
+        async () => {
+            await api(`/doors/${door.id}/membership`, { method: "DELETE" });
+            state.activeDoor = null;
+            closeDialog(detailDialog);
+            state.doors = state.doors.filter(item => item.id !== door.id);
+            renderDoors();
+            toast("Door removed from your account.");
+        },
+    );
+}
+
 function confirmDelete(door) {
     showConfirm(
         `Delete ${door.name}?`,
-        "Its status and complete activity history will be permanently removed.",
+        "Its status and complete activity history will be permanently removed. Anyone it is shared with will also lose access.",
         "Delete door",
         async () => {
             await api(`/doors/${door.id}`, { method: "DELETE" });
@@ -480,6 +664,23 @@ function bindEvents() {
     $("#confirm-delete-button").addEventListener("click", runConfirmAction);
     $("#regenerate-token").addEventListener("click", confirmRegenerateToken);
     $("#firmware-update-button").addEventListener("click", requestFirmwareUpdate);
+    $("#detail-share").addEventListener("click", () => openSharing(state.activeDoor));
+    $("#detail-leave").addEventListener("click", leaveSharedDoor);
+    $("#detail-pin").addEventListener("change", event => updateDoorPreference("is_pinned", event.target.checked));
+    $("#detail-notifications").addEventListener("change", event => updateDoorPreference("notifications_enabled", event.target.checked));
+    $("#sharing-form").addEventListener("submit", sendDoorInvitation);
+    $("#sharing-members").addEventListener("click", handleSharingAction);
+    $("#sharing-invitations").addEventListener("click", handleSharingAction);
+    $("#pending-invitation-list").addEventListener("click", handlePendingInvitation);
+    $("#copy-invite-link").addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText($("#invite-link-value").value);
+            toast("Invitation link copied.");
+        } catch {
+            $("#invite-link-value").select();
+            toast("Select and copy the invitation link.");
+        }
+    });
     $$('[data-close]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog"))));
 
     doorGrid.addEventListener("click", event => {
@@ -512,6 +713,7 @@ async function initialize() {
         $("#user-greeting").textContent = state.user?.name || state.user?.email || "Account";
         $("#user-avatar").textContent = (state.user?.name || state.user?.email || "A").charAt(0).toUpperCase();
         await loadDoors();
+        await loadPendingInvitations();
         startRealtime().catch(error => {
             console.error("Realtime updates are unavailable:", errorMessage(error));
         });

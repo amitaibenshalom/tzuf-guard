@@ -24,7 +24,14 @@ def user_to_dict(user):
     }
 
 
-def door_to_dict(door, include_events=False, events=None):
+def door_to_dict(door, include_events=False, events=None, viewer=None):
+    viewer_id = getattr(viewer, "id", viewer)
+    membership = None
+    if viewer_id is not None and door.user_id != viewer_id:
+        membership = next(
+            (item for item in door.memberships if item.user_id == viewer_id),
+            None,
+        )
     data = {
         "id": door.id,
         "name": door.name,
@@ -39,8 +46,10 @@ def door_to_dict(door, include_events=False, events=None):
         "firmware_version": door.firmware_version,
         "firmware_update_requested_at": isoformat(door.firmware_update_requested_at),
         "firmware_update_target_version": door.firmware_update_target_version,
-        "notifications_enabled": door.notifications_enabled,
-        "is_pinned": door.is_pinned,
+        "notifications_enabled": membership.notifications_enabled if membership else door.notifications_enabled,
+        "is_pinned": membership.is_pinned if membership else door.is_pinned,
+        "access_role": "member" if membership else "owner",
+        "member_count": len(door.memberships),
         "created_at": isoformat(door.created_at),
         "updated_at": isoformat(door.updated_at),
     }
@@ -49,6 +58,28 @@ def door_to_dict(door, include_events=False, events=None):
     elif include_events:
         data["events"] = [door_event_to_dict(event) for event in door.events]
     return data
+
+
+def door_membership_to_dict(membership):
+    return {
+        "id": membership.id,
+        "user_id": membership.user_id,
+        "name": membership.user.name,
+        "email": membership.user.email,
+        "notifications_enabled": membership.notifications_enabled,
+        "is_pinned": membership.is_pinned,
+        "joined_at": isoformat(membership.created_at),
+    }
+
+
+def door_invitation_to_dict(invitation):
+    return {
+        "id": invitation.id,
+        "email": invitation.email,
+        "inviter_name": invitation.invited_by.name or invitation.invited_by.email,
+        "created_at": isoformat(invitation.created_at),
+        "expires_at": isoformat(invitation.expires_at),
+    }
 
 
 def door_event_to_dict(event):

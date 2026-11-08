@@ -27,6 +27,15 @@ class User(TimestampMixin, db.Model):
     google_sub = db.Column(db.String(255), nullable=True, unique=True, index=True)
 
     doors = db.relationship("Door", back_populates="user", cascade="all, delete-orphan")
+    door_memberships = db.relationship(
+        "DoorMembership", back_populates="user", cascade="all, delete-orphan"
+    )
+    sent_door_invitations = db.relationship(
+        "DoorInvitation",
+        foreign_keys="DoorInvitation.invited_by_user_id",
+        back_populates="invited_by",
+        cascade="all, delete-orphan",
+    )
     push_devices = db.relationship(
         "PushDevice", back_populates="user", cascade="all, delete-orphan"
     )
@@ -62,11 +71,61 @@ class Door(TimestampMixin, db.Model):
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
 
     user = db.relationship("User", back_populates="doors")
+    memberships = db.relationship(
+        "DoorMembership", back_populates="door", cascade="all, delete-orphan"
+    )
+    invitations = db.relationship(
+        "DoorInvitation", back_populates="door", cascade="all, delete-orphan"
+    )
     events = db.relationship(
         "DoorEvent",
         back_populates="door",
         cascade="all, delete-orphan",
         order_by="DoorEvent.received_at.desc()",
+    )
+
+
+class DoorMembership(db.Model):
+    __tablename__ = "door_memberships"
+    __table_args__ = (
+        UniqueConstraint("door_id", "user_id", name="uq_door_membership_user"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    door_id = db.Column(db.Integer, db.ForeignKey("doors.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    is_pinned = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    door = db.relationship("Door", back_populates="memberships")
+    user = db.relationship("User", back_populates="door_memberships")
+
+
+class DoorInvitation(db.Model):
+    __tablename__ = "door_invitations"
+    __table_args__ = (
+        UniqueConstraint("door_id", "email", name="uq_door_invitation_email"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    door_id = db.Column(db.Integer, db.ForeignKey("doors.id"), nullable=False, index=True)
+    invited_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    email = db.Column(db.String(255), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    accepted_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    declined_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    revoked_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    door = db.relationship("Door", back_populates="invitations")
+    invited_by = db.relationship(
+        "User",
+        foreign_keys=[invited_by_user_id],
+        back_populates="sent_door_invitations",
     )
 
 

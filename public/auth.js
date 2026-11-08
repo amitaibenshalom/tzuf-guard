@@ -121,10 +121,8 @@ if (forgotButton && forgotForm) {
 $$('[data-close]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog"))));
 if (new URLSearchParams(location.search).has("expired")) errorNode.textContent = "Your session expired. Log in again to continue.";
 initGoogle();
-if (mode === "login") {
-    const email = sessionStorage.getItem(LOGIN_EMAIL_KEY);
-    if (email) {
-        form.elements.email.value = email;
-        sessionStorage.removeItem(LOGIN_EMAIL_KEY);
-    }
+const invitationEmail = sessionStorage.getItem(LOGIN_EMAIL_KEY);
+if (invitationEmail && form.elements.email) {
+    form.elements.email.value = invitationEmail;
+    sessionStorage.removeItem(LOGIN_EMAIL_KEY);
 }

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#f7f8f4">
+    <title>Door invitation · TzufGuard</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script type="module" src="{{ url_for('static', filename='invite.js') }}"></script>
+</head>
+<body class="invite-page">
+    {% include "_icons.html" %}
+    <main class="invite-shell">
+        <a class="brand invite-brand" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+        <section class="invite-card" aria-labelledby="invite-title">
+            <div class="invite-icon"><svg><use href="#icon-logo"/></svg></div>
+            <p class="eyebrow">Door invitation</p>
+            <h1 id="invite-title">You’re invited</h1>
+            <p id="invite-copy" class="invite-copy">Loading invitation…</p>
+            <p id="invite-email" class="invite-email hidden"></p>
+            <p id="invite-error" class="form-error" role="alert"></p>
+            <div id="invite-actions" class="invite-actions"></div>
+            <a class="invite-home" href="/">Back to TzufGuard</a>
+        </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

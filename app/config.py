@@ -99,6 +99,14 @@ class Config:
     PASSWORD_RESET_EXPIRES_MINUTES = int(
         os.getenv("PASSWORD_RESET_EXPIRES_MINUTES", "60")
     )
+    DOOR_INVITATION_EXPIRES_DAYS = int(
+        os.getenv("DOOR_INVITATION_EXPIRES_DAYS", "7")
+    )
+    PUBLIC_APP_URL = (
+        os.getenv("PUBLIC_APP_URL", "https://amitaibenshalom.com")
+        .strip()
+        .rstrip("/")
+    )
     MAIL_FROM = os.getenv("MAIL_FROM", "no-reply@amitaibenshalom.com").strip()
     SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

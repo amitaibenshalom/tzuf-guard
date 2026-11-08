@@ -100,15 +100,16 @@ class RealtimeService:
         if not api_key:
             return False
 
-        payload = {
-            "version": 1,
-            "door": door_to_dict(door),
-            "event": door_event_to_dict(event) if event is not None else None,
-            "reason": reason,
-        }
-        publications = [
-            (user_door_channel(door.user_id), event_name, payload)
-        ]
+        viewer_ids = {door.user_id, *(membership.user_id for membership in door.memberships)}
+        publications = []
+        for viewer_id in viewer_ids:
+            payload = {
+                "version": 1,
+                "door": door_to_dict(door, viewer=viewer_id),
+                "event": door_event_to_dict(event) if event is not None else None,
+                "reason": reason,
+            }
+            publications.append((user_door_channel(viewer_id), event_name, payload))
         if event_name in {DOOR_STATUS_EVENT, DOOR_HEALTH_EVENT} and self._is_public_demo_door(door.id):
             publications.append(
                 (
