@@ -502,7 +502,9 @@ async function sendDoorInvitation(event) {
         });
         form.reset();
         $("#invite-link-value").value = payload.invitation_url;
-        $("#invite-link-message").textContent = "This private invitation link is ready to share directly, whether or not you also send an email.";
+        $("#invite-link-message").textContent = payload.email_sent
+            ? `Invitation email sent to ${payload.invitation.email}. You can also share the link directly.`
+            : `Email could not be sent to ${payload.invitation.email}. You can still share the link directly.`;
         $("#invite-link-fallback").classList.remove("hidden");
         toast(payload.email_sent
             ? `Invitation email sent to ${payload.invitation.email}.`

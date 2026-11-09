@@ -394,7 +394,7 @@ input::placeholder { color: var(--ink-muted); }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-.invite-link-share { margin-top: 10px; }
+.invite-link-share { width: 100%; margin-top: 10px; }
 
 /* Privacy policy and installable web app */
 .site-footer { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 18px; color: var(--ink-tertiary); font-size: .78rem; }
