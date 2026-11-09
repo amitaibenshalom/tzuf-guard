@@ -459,6 +459,13 @@ function showConfirm(title, copy, buttonText, action) {
     openDialog(confirmDialog);
 }
 
+function invitationLinkPreview(url) {
+    const tokenMarker = url.indexOf("?token=");
+    if (tokenMarker >= 0) return `${url.slice(0, tokenMarker)}?token=...`;
+    const maxLength = 44;
+    return url.length > maxLength ? `${url.slice(0, maxLength - 3)}...` : url;
+}
+
 function renderSharing(payload) {
     const owner = payload.owner;
     const members = payload.members;
@@ -502,7 +509,7 @@ async function sendDoorInvitation(event) {
         });
         form.reset();
         const inviteLinkValue = $("#invite-link-value");
-        inviteLinkValue.textContent = payload.invitation_url;
+        inviteLinkValue.textContent = invitationLinkPreview(payload.invitation_url);
         inviteLinkValue.title = payload.invitation_url;
         inviteLinkValue.dataset.url = payload.invitation_url;
         $("#invite-link-message").textContent = payload.email_sent
