@@ -193,7 +193,9 @@ input::placeholder { color: var(--ink-muted); }
 .door-card__top-meta { min-width: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 9px; }
 .door-pin { display: inline-flex; align-items: center; gap: 4px; color: var(--leaf); font-size: .66rem; font-weight: 760; }
 .door-pin svg { width: 14px; height: 14px; }
+.state-timing { min-width: 0; display: inline-grid; justify-items: end; gap: 3px; }
 .state-duration { color: var(--ink-tertiary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.state-started-at { color: var(--ink-muted); font-size: .65rem; font-weight: 620; line-height: 1.3; text-align: right; }
 .status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; font-size: .68rem; font-weight: 820; text-transform: uppercase; letter-spacing: .075em; }
 .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .status--opened { color: #ad3d34; background: var(--open-soft); }
@@ -281,7 +283,9 @@ input::placeholder { color: var(--ink-muted); }
 .web-preference input:checked { background: var(--leaf); }
 .web-preference input:checked::before { transform: translateX(18px); }
 .detail-status { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 8px 0 34px; padding: 20px; border-radius: 16px; background: var(--surface-inset); }
-.detail-status .state-duration { display: inline-block; margin-left: 11px; color: var(--ink); }
+.detail-status .state-timing { display: inline-grid; margin-left: 11px; justify-items: start; vertical-align: middle; }
+.detail-status .state-duration { color: var(--ink); }
+.detail-status .state-started-at { color: var(--ink-tertiary); text-align: left; }
 .detail-status p { margin: 5px 0 0; color: var(--ink-tertiary); font-size: .8rem; }
 .sensor-offline-alert { display: flex; align-items: center; gap: 12px; margin: -22px 0 18px; padding: 14px 16px; border-radius: 14px; color: var(--warning); background: var(--warning-soft); }
 .sensor-offline-alert > svg { width: 22px; height: 22px; flex: 0 0 auto; }
@@ -385,7 +389,7 @@ input::placeholder { color: var(--ink-muted); }
     .history-item { grid-template-columns: 14px 1fr; }
     .history-item time { grid-column: 2; text-align: left; }
     .detail-status { align-items: start; flex-direction: column; }
-    .detail-status .state-duration { display: block; margin: 9px 0 0; }
+    .detail-status .state-timing { display: grid; margin: 9px 0 0; }
     .firmware-panel { align-items: stretch; flex-direction: column; }
     .firmware-panel .button { width: 100%; }
     .reset-card, .not-found-card { padding: 30px 24px; }

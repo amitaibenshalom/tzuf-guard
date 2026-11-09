@@ -92,6 +92,39 @@ export function durationText(status, startedAt) {
     return `${statusMeta(status).label} for ${formatElapsed((Date.now() - started) / 1000)}`;
 }
 
+export function statusStartedText(status, startedAt, now = Date.now()) {
+    const date = new Date(startedAt);
+    if (!Number.isFinite(date.getTime()) || !["opened", "closed"].includes(status)) return "";
+
+    const current = new Date(now);
+    const localDay = value => Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+    const daysAgo = Math.floor((localDay(current) - localDay(date)) / 86400000);
+    let relative;
+    if (daysAgo <= 0) relative = "today";
+    else if (daysAgo === 1) relative = "yesterday";
+    else if (daysAgo < 7) relative = `${daysAgo} days ago`;
+    else if (daysAgo < 30) {
+        const weeks = Math.floor(daysAgo / 7);
+        relative = `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+    } else if (daysAgo < 365) {
+        const months = Math.floor(daysAgo / 30);
+        relative = `${months} ${months === 1 ? "month" : "months"} ago`;
+    } else {
+        const years = Math.floor(daysAgo / 365);
+        relative = `${years} ${years === 1 ? "year" : "years"} ago`;
+    }
+
+    const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
+    const fullDate = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        ...(date.getFullYear() !== current.getFullYear() ? { year: "numeric" } : {}),
+    }).format(date);
+    const timestamp = daysAgo <= 1 ? `${relative} at ${time}` : `${relative} · ${fullDate} at ${time}`;
+    const state = status === "opened" ? "Opened" : "Closed";
+    return `${state} since ${timestamp}`;
+}
+
 export function setDurationCounter(element, status, startedAt) {
     if (!element) return;
     if (!startedAt || !["opened", "closed"].includes(status)) {
@@ -109,6 +142,9 @@ export function updateDurationCounters() {
     $$('[data-duration-started-at]').forEach(element => {
         element.textContent = durationText(element.dataset.durationStatus, element.dataset.durationStartedAt);
     });
+    $$('[data-state-started-at]').forEach(element => {
+        element.textContent = statusStartedText(element.dataset.stateStatus, element.dataset.stateStartedAt);
+    });
 }
 
 export function durationMarkup(door) {
@@ -119,7 +155,8 @@ export function durationMarkup(door) {
     }
     if (!["opened", "closed"].includes(door.last_status)) return "";
     if (!door.status_changed_at) return '<span class="state-duration">Duration starts with the next change</span>';
-    return `<span class="state-duration" data-duration-status="${door.last_status}" data-duration-started-at="${escapeHtml(door.status_changed_at)}">${escapeHtml(durationText(door.last_status, door.status_changed_at))}</span>`;
+    const startedAt = escapeHtml(door.status_changed_at);
+    return `<span class="state-timing"><span class="state-duration" data-duration-status="${door.last_status}" data-duration-started-at="${startedAt}">${escapeHtml(durationText(door.last_status, door.status_changed_at))}</span><span class="state-started-at" data-state-status="${door.last_status}" data-state-started-at="${startedAt}">${escapeHtml(statusStartedText(door.last_status, door.status_changed_at))}</span></span>`;
 }
 
 export function formatDate(value) {
