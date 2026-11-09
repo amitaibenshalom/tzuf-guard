@@ -502,13 +502,11 @@ async function sendDoorInvitation(event) {
         });
         form.reset();
         $("#invite-link-value").value = payload.invitation_url;
-        $("#invite-link-message").textContent = payload.email_sent
-            ? `Invitation emailed to ${payload.invitation.email}. You can also share this private link directly.`
-            : "Email delivery did not complete. Share this private link directly instead.";
+        $("#invite-link-message").textContent = "This private invitation link is ready to share directly, whether or not you also send an email.";
         $("#invite-link-fallback").classList.remove("hidden");
         toast(payload.email_sent
-            ? `Invitation sent to ${payload.invitation.email}.`
-            : "Invitation created. Share the link below.");
+            ? `Invitation email sent to ${payload.invitation.email}.`
+            : "Email could not be sent. The invite link is ready to share.");
         renderSharing(await api(`/doors/${state.sharingDoor.id}/sharing`));
     } catch (error) {
         errorNode.textContent = errorMessage(error);
