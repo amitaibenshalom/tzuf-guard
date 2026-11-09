@@ -78,6 +78,10 @@ def register_routes(app):
     def reset_password_page():
         return render_template("reset_password.html")
 
+    @app.get("/privacy")
+    def privacy_page():
+        return render_template("privacy.html")
+
     @app.get("/invite")
     def invite_page():
         return render_template("invite.html")

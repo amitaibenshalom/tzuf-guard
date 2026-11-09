@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex">
     <title>Page not found · TzufGuard</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    {% include "_pwa_head.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body class="not-found-page">
@@ -17,5 +18,6 @@
         <p>The page may have moved, or the address may be incorrect.</p>
         <a class="button button--forest" href="/">Return home</a>
     </main>
+    {% include "_site_footer.html" %}
 </body>
 </html>

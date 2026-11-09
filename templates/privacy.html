@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Learn what information TzufGuard collects, how it is used, and the choices you have.">
+    <meta name="theme-color" content="#102f27">
+    <title>Privacy policy · TzufGuard</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    {% include "_pwa_head.html" %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="privacy-page">
+    {% include "_icons.html" %}
+    <header class="simple-header page-width privacy-header">
+        <a class="brand" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
+        <a class="back-link" href="/">Home</a>
+    </header>
+    <main class="privacy-main">
+        <p class="eyebrow">Your information</p>
+        <h1>Privacy policy</h1>
+        <p class="privacy-updated">Last updated November 9, 2026</p>
+        <p class="privacy-lede">TzufGuard is operated by Amitai Ben Shalom. This policy explains what information the service uses to provide door monitoring, sharing, and account features.</p>
+
+        <section>
+            <h2>Information we handle</h2>
+            <ul>
+                <li><strong>Account details:</strong> your name and email address, password hash, and the identifier returned by Google when you choose Google sign-in. We do not store your Google password.</li>
+                <li><strong>Door and sensor data:</strong> door names and optional locations, sensor/device names, open or closed reports, report times, heartbeat and online status, firmware version, and activity history.</li>
+                <li><strong>Sharing:</strong> email addresses you invite, invitation and membership records, and each member’s own alert and pin preferences.</li>
+                <li><strong>Notifications:</strong> push notification tokens and platform information for devices you register to receive door alerts.</li>
+                <li><strong>Account recovery:</strong> password reset tokens are stored in hashed form with an expiration time.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>How we use information</h2>
+            <p>We use this information to authenticate you, show door status and history, deliver invitations and alerts, support firmware updates, secure the service, and respond to support requests. Door status changes and sensor heartbeat information are processed so the dashboard can show current status and whether a sensor is online.</p>
+        </section>
+
+        <section>
+            <h2>Who can see door information</h2>
+            <p>Your doors and their history are available to you and people you invite. Door owners can manage access; invited members can view status and history and manage their own alert and pin preferences. An owner can revoke a member’s access at any time. A door’s configured public demonstration, if enabled by the service operator, may show its label, current open/closed status, elapsed time in that state, and online status on the public homepage.</p>
+        </section>
+
+        <section>
+            <h2>Service providers</h2>
+            <p>TzufGuard uses third-party providers to run the service: Vercel for hosting, Turso for the database, Ably for realtime updates, Brevo for email delivery, Google for optional sign-in, and Expo’s push service for app notifications. These providers process information needed to perform their services under their own terms and privacy policies. When you use Google sign-in, Google also processes information according to your Google account settings.</p>
+        </section>
+
+        <section>
+            <h2>Browser storage and technical logs</h2>
+            <p>The website stores your sign-in token in your browser’s local storage so you can remain signed in. The service does not use its own analytics or advertising trackers. Our hosting and service providers may process technical data such as IP address, request time, and error logs to operate and protect their services.</p>
+        </section>
+
+        <section>
+            <h2>Retention and your choices</h2>
+            <p>Your account information, doors, and activity history remain while your account is active. You can edit or delete doors, cancel invitations, and remove shared access from the website or app. Deleting your account permanently deletes your account, owned doors and histories, notification registrations, memberships, and invitations associated with your account. Provider logs or backups may remain for limited periods under the providers’ retention practices.</p>
+        </section>
+
+        <section>
+            <h2>Security</h2>
+            <p>Passwords are stored as hashes, and service connections use HTTPS. No online service can promise absolute security, so use a unique password and keep your account credentials private. If you believe your account was accessed without permission, contact us.</p>
+        </section>
+
+        <section>
+            <h2>Changes and contact</h2>
+            <p>Depending on where you live, local law may give you rights to request access to, correction of, or deletion of your personal information. This policy may be updated as TzufGuard changes; the current version and update date will appear on this page. For questions, data requests, or privacy concerns, email <a href="mailto:amitai@amitaibenshalom.com">amitai@amitaibenshalom.com</a>.</p>
+        </section>
+    </main>
+    {% include "_site_footer.html" %}
+</body>
+</html>

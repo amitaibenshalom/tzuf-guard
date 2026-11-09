@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#f7f8f4">
     <title>Your doors · TzufGuard</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    {% include "_pwa_head.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
     <script src="{{ url_for('static', filename='vendor/ably-pubsub-device-3.0.0.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='dashboard.js') }}"></script>
@@ -18,6 +19,7 @@
             <a class="brand" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
             <nav class="app-nav" aria-label="Application navigation"><a class="active" href="/app/doors" aria-current="page">Doors</a></nav>
             <div class="topbar-user">
+                <button class="button button--quiet button--small pwa-install-button" data-install-app type="button" hidden>Install app</button>
                 <details id="account-menu" class="account-menu">
                     <summary class="account-menu__trigger" aria-label="Open account menu" title="Account">
                         <span id="user-avatar" class="account-menu__avatar">A</span>
@@ -51,6 +53,7 @@
         <div id="door-grid" class="door-grid hidden"></div>
         <div id="empty-state" class="empty-state hidden"><div class="empty-icon"><svg><use href="#icon-logo"/></svg></div><h2>No doors yet</h2><p>Add your first door to generate its one-time sensor setup phrase.</p><button class="button button--forest" data-action="add-door" type="button">Add your first door</button></div>
     </main>
+    {% include "_site_footer.html" %}
 
     <dialog id="door-form-dialog" class="modal"><form id="door-form" class="modal-card"><div class="modal-head"><div><p class="eyebrow" id="door-form-eyebrow">New monitor</p><h2 id="door-form-title">Add a door</h2></div><button class="icon-button" data-close type="button" aria-label="Close"><svg><use href="#icon-close"/></svg></button></div><input name="door_id" type="hidden"><label>Door name<input name="name" maxlength="120" required placeholder="Front door"></label><label>Location <span class="optional">Optional</span><input name="location" maxlength="120" placeholder="Ground floor"></label><p class="form-error" data-form-error></p><button class="button button--forest button--full" type="submit">Save door</button></form></dialog>
 

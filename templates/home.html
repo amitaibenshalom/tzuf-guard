@@ -12,6 +12,7 @@
     <title>TzufGuard · Know when a door changes</title>
     <link rel="canonical" href="https://amitaibenshalom.com/">
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    {% include "_pwa_head.html" %}
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
     <script src="{{ url_for('static', filename='vendor/ably-pubsub-device-3.0.0.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='home.js') }}"></script>
@@ -23,6 +24,7 @@
         <header class="site-header page-width">
             <a class="brand brand--light" href="/" aria-label="TzufGuard home"><svg><use href="#icon-logo"/></svg><span>TzufGuard</span></a>
             <nav class="site-nav" aria-label="Primary navigation">
+                <button class="button button--ghost-light button--small pwa-install-button" data-install-app type="button" hidden>Install app</button>
                 <a id="home-login-link" href="/login">Log in</a>
                 <a id="home-nav-cta" class="button button--mint button--small" href="/register">Create account</a>
             </nav>
@@ -51,5 +53,6 @@
             </aside>
         </section>
     </div>
+    {% include "_site_footer.html" %}
 </body>
 </html>

@@ -395,3 +395,43 @@ input::placeholder { color: var(--ink-muted); }
 }
 
 .invite-link-share { margin-top: 10px; }
+
+/* Privacy policy and installable web app */
+.site-footer { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 18px; color: var(--ink-tertiary); font-size: .78rem; }
+.site-footer nav { display: flex; align-items: center; gap: 18px; }
+.site-footer a:hover { color: var(--leaf); }
+.marketing-page .site-footer { color: rgba(255,255,255,.68); }
+.marketing-page .site-footer a:hover { color: #fff; }
+.marketing-page .site-footer .button--quiet { color: #fff; background: rgba(255,255,255,.12); }
+.privacy-page { min-height: 100vh; background: var(--plaster); }
+.privacy-header { justify-content: space-between; }
+.privacy-main { width: min(800px, calc(100% - 40px)); margin: 22px auto 50px; }
+.privacy-main h1 { margin: 0; color: var(--painted-door); font-size: clamp(2.5rem, 7vw, 4.2rem); line-height: 1; letter-spacing: -.06em; }
+.privacy-updated { margin: 14px 0 0; color: var(--ink-tertiary); font-size: .82rem; }
+.privacy-lede { margin: 25px 0 40px; color: var(--ink-secondary); font-size: 1.15rem; line-height: 1.7; }
+.privacy-main section { padding: 25px 0; border-top: 1px solid var(--frame-line); }
+.privacy-main h2 { margin: 0 0 12px; color: var(--painted-door); font-size: 1.25rem; letter-spacing: -.025em; }
+.privacy-main p, .privacy-main li { color: var(--ink-secondary); font-size: .94rem; line-height: 1.75; }
+.privacy-main p { margin: 0; }
+.privacy-main ul { display: grid; gap: 12px; margin: 0; padding-left: 22px; }
+.privacy-main a { color: var(--leaf); text-decoration: underline; text-underline-offset: 3px; }
+.pwa-install-button[hidden] { display: none !important; }
+.pwa-install-dialog { width: min(480px, calc(100% - 28px)); padding: 0; border: 0; border-radius: var(--radius-modal); color: var(--ink); background: transparent; box-shadow: var(--lift-high); }
+.pwa-install-dialog::backdrop { background: rgba(7, 24, 18, .62); backdrop-filter: blur(5px); }
+.pwa-install-dialog .modal-card { padding: 28px; border-radius: var(--radius-modal); background: var(--surface); }
+.pwa-install-dialog .modal-head { align-items: flex-start; }
+.pwa-install-dialog h2 { margin: 0; color: var(--painted-door); font-size: 1.45rem; }
+.pwa-install-dialog p, .pwa-install-dialog li { color: var(--ink-secondary); font-size: .9rem; line-height: 1.6; }
+.pwa-install-dialog ol { display: grid; gap: 8px; margin: 18px 0 24px; padding-left: 22px; }
+@media (max-width: 620px) {
+    .site-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .site-footer nav { flex-wrap: wrap; gap: 8px 16px; }
+    .privacy-main { margin-top: 10px; }
+}
+
+@media (max-width: 420px) {
+    .site-nav #home-login-link { display: none; }
+    .site-nav { gap: 8px; }
+    .site-nav .pwa-install-button, .site-nav .button { padding-inline: 10px; font-size: .72rem; }
+    .app-header .pwa-install-button { padding-inline: 9px; font-size: .7rem; }
+}
