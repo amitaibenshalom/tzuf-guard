@@ -501,7 +501,10 @@ async function sendDoorInvitation(event) {
             body: JSON.stringify({ email: form.elements.email.value.trim() }),
         });
         form.reset();
-        $("#invite-link-value").value = payload.invitation_url;
+        const inviteLinkValue = $("#invite-link-value");
+        inviteLinkValue.textContent = payload.invitation_url;
+        inviteLinkValue.title = payload.invitation_url;
+        inviteLinkValue.dataset.url = payload.invitation_url;
         $("#invite-link-message").textContent = payload.email_sent
             ? `Invitation email sent to ${payload.invitation.email}. You can also share the link directly.`
             : `Email could not be sent to ${payload.invitation.email}. You can still share the link directly.`;
@@ -674,16 +677,22 @@ function bindEvents() {
     $("#sharing-invitations").addEventListener("click", handleSharingAction);
     $("#pending-invitation-list").addEventListener("click", handlePendingInvitation);
     $("#copy-invite-link").addEventListener("click", async () => {
+        const linkNode = $("#invite-link-value");
+        const url = linkNode.dataset.url || linkNode.textContent;
         try {
-            await navigator.clipboard.writeText($("#invite-link-value").value);
+            await navigator.clipboard.writeText(url);
             toast("Invitation link copied.");
         } catch {
-            $("#invite-link-value").select();
-            toast("Select and copy the invitation link.");
+            const range = document.createRange();
+            range.selectNodeContents(linkNode);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            toast("Invitation link selected. Copy it now.");
         }
     });
     $("#share-invite-link").addEventListener("click", async () => {
-        const url = $("#invite-link-value").value;
+        const url = $("#invite-link-value").dataset.url || $("#invite-link-value").textContent;
         if (navigator.share) {
             try {
                 await navigator.share({ title: "TzufGuard door invitation", url });
@@ -696,8 +705,13 @@ function bindEvents() {
             await navigator.clipboard.writeText(url);
             toast("Invitation link copied.");
         } catch {
-            $("#invite-link-value").select();
-            toast("Select and copy the invitation link.");
+            const linkNode = $("#invite-link-value");
+            const range = document.createRange();
+            range.selectNodeContents(linkNode);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            toast("Invitation link selected. Copy it now.");
         }
     });
     $$('[data-close]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog"))));
