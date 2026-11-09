@@ -215,7 +215,7 @@ input::placeholder { color: var(--ink-muted); }
 .app-nav a { height: 100%; display: inline-flex; align-items: center; position: relative; color: var(--ink-tertiary); font-size: .83rem; font-weight: 720; }
 .app-nav a.active { color: var(--ink); }
 .app-nav a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--leaf); }
-.topbar-user { display: flex; align-items: center; gap: 14px; color: var(--ink-tertiary); font-size: .8rem; }
+.topbar-user { justify-self: end; display: flex; align-items: center; gap: 14px; color: var(--ink-tertiary); font-size: .8rem; }
 .account-menu { position: relative; }
 .account-menu > summary { list-style: none; }
 .account-menu > summary::-webkit-details-marker { display: none; }
@@ -524,7 +524,7 @@ input::placeholder { color: var(--ink-muted); }
     .app-header .pwa-install-button { padding-inline: 9px; font-size: .7rem; }
 }
 
-/* Appearance controls are shared by every page. */
+/* Theme preference lives in the authenticated account menu. */
 .theme-picker { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: inherit; font-size: .78rem; font-weight: 600; }
 .theme-picker select { min-height: 40px; max-width: 120px; padding: 6px 10px; border: 1px solid var(--frame-line); border-radius: 10px; font: inherit; color: var(--ink); background: var(--surface); cursor: pointer; }
 .account-menu__panel .theme-picker { display: flex; justify-content: space-between; padding: 6px 10px; color: var(--ink-secondary); }

@@ -2,8 +2,9 @@
 (() => {
     const storageKey = "tzufguard_theme";
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-    const validPreference = value => ["light", "dark", "system"].includes(value) ? value : "system";
-    let preference = "system";
+    const validPreference = value => ["light", "dark", "system"].includes(value) ? value : "light";
+    const forceLight = /^\/(login|register)\/?$/.test(location.pathname);
+    let preference = "light";
     try {
         preference = validPreference(localStorage.getItem(storageKey));
     } catch {
@@ -11,7 +12,7 @@
     }
 
     function applyTheme() {
-        const theme = preference === "system" ? (systemTheme.matches ? "dark" : "light") : preference;
+        const theme = forceLight ? "light" : preference === "system" ? (systemTheme.matches ? "dark" : "light") : preference;
         const changed = document.documentElement.dataset.theme !== theme;
         document.documentElement.dataset.theme = theme;
         document.querySelectorAll("[data-theme-preference]").forEach(control => {
