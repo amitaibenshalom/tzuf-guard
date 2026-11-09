@@ -501,13 +501,14 @@ async function sendDoorInvitation(event) {
             body: JSON.stringify({ email: form.elements.email.value.trim() }),
         });
         form.reset();
-        if (payload.email_sent) {
-            toast(`Invitation sent to ${payload.invitation.email}.`);
-            $("#invite-link-fallback").classList.add("hidden");
-        } else {
-            $("#invite-link-value").value = payload.invitation_url;
-            $("#invite-link-fallback").classList.remove("hidden");
-        }
+        $("#invite-link-value").value = payload.invitation_url;
+        $("#invite-link-message").textContent = payload.email_sent
+            ? `Invitation emailed to ${payload.invitation.email}. You can also share this private link directly.`
+            : "Email delivery did not complete. Share this private link directly instead.";
+        $("#invite-link-fallback").classList.remove("hidden");
+        toast(payload.email_sent
+            ? `Invitation sent to ${payload.invitation.email}.`
+            : "Invitation created. Share the link below.");
         renderSharing(await api(`/doors/${state.sharingDoor.id}/sharing`));
     } catch (error) {
         errorNode.textContent = errorMessage(error);
@@ -675,6 +676,24 @@ function bindEvents() {
     $("#copy-invite-link").addEventListener("click", async () => {
         try {
             await navigator.clipboard.writeText($("#invite-link-value").value);
+            toast("Invitation link copied.");
+        } catch {
+            $("#invite-link-value").select();
+            toast("Select and copy the invitation link.");
+        }
+    });
+    $("#share-invite-link").addEventListener("click", async () => {
+        const url = $("#invite-link-value").value;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: "TzufGuard door invitation", url });
+                return;
+            } catch (error) {
+                if (error.name === "AbortError") return;
+            }
+        }
+        try {
+            await navigator.clipboard.writeText(url);
             toast("Invitation link copied.");
         } catch {
             $("#invite-link-value").select();

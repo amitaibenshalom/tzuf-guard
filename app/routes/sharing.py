@@ -226,11 +226,10 @@ def create_door_invitation(current_user, door_id):
     response = {
         "invitation": door_invitation_to_dict(invitation),
         "email_sent": email_sent,
-    }
-    if not email_sent:
-        response["invitation_url"] = (
+        "invitation_url": (
             f"{current_app.config['PUBLIC_APP_URL']}/invite?token={raw_token}"
-        )
+        ),
+    }
     return jsonify(response), 201
 
 

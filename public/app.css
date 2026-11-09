@@ -393,3 +393,5 @@ input::placeholder { color: var(--ink-muted); }
     html { scroll-behavior: auto; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.invite-link-share { margin-top: 10px; }
