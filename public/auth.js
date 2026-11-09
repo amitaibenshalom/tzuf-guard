@@ -86,11 +86,20 @@ function initGoogle(attempt = 0) {
             }
         },
     });
+    renderGoogleButton();
+}
+
+function renderGoogleButton() {
+    if (!window.google?.accounts?.id || !$("#google-button")) return;
     const width = Math.min(400, Math.floor($(".auth-card").clientWidth));
+    $("#google-button").replaceChildren();
     window.google.accounts.id.renderButton($("#google-button"), {
-        theme: "outline", size: "large", shape: "pill", width,
+        theme: document.documentElement.dataset.theme === "dark" ? "filled_black" : "outline",
+        size: "large", shape: "pill", width,
     });
 }
+
+window.addEventListener("tzufguard:themechange", renderGoogleButton);
 
 const forgotButton = $("#forgot-password-button");
 const forgotForm = $("#forgot-form");

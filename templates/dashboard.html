@@ -27,6 +27,8 @@
                         <svg class="account-menu__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
                     </summary>
                     <div class="account-menu__panel">
+                        {% include "_theme_picker.html" %}
+                        <div class="account-menu__divider" role="separator"></div>
                         <button id="logout-button" class="account-menu__item" type="button">Log out</button>
                         <div class="account-menu__divider" role="separator"></div>
                         <button id="delete-account-open" class="account-menu__item account-menu__item--danger" type="button"><svg><use href="#icon-trash"/></svg><span>Delete account</span></button>
