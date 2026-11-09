@@ -82,12 +82,13 @@ function renderDoors() {
         const sharedBadge = door.access_role === "member"
             ? `<span class="door-shared-badge">${icon("users")}Shared with you</span>`
             : door.member_count > 0 ? `<span class="door-shared-badge">${icon("users")}Shared</span>` : "";
+        const pinnedBadge = door.is_pinned ? `<span class="door-pin">${icon("pin")}Pinned</span>` : "";
         const actions = door.access_role === "owner" ? `<button class="icon-button" data-action="edit" type="button" aria-label="Edit ${escapeHtml(door.name)}" title="Edit">${icon("edit")}</button>
                 <button class="icon-button icon-button--danger" data-action="delete" type="button" aria-label="Delete ${escapeHtml(door.name)}" title="Delete">${icon("trash")}</button>` : "";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
-                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${door.is_pinned ? `<span class="door-pin">${icon("pin")} Pinned</span>` : ""}${durationMarkup(door)}</span></div>
-                <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location} ${sharedBadge}</p>
+                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${durationMarkup(door)}</span></div>
+                <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location} ${pinnedBadge} ${sharedBadge}</p>
                 <p class="door-seen">${icon(!hasReported ? "clock" : door.is_online ? "wifi" : "offline")}<span>${sensorLabel}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
             </button>
