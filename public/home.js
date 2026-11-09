@@ -142,11 +142,11 @@ logoutButton.addEventListener("click", () => {
 });
 
 if (hasSession()) {
-    $("#home-login-link").classList.add("hidden");
     logoutButton.classList.remove("hidden");
     $("#hero-title").textContent = "Welcome back";
     $("#home-primary-cta").innerHTML = 'Open your doors <svg aria-hidden="true"><use href="#icon-arrow"></use></svg>';
     $("#home-primary-cta").href = "/app/doors";
+    $("#home-secondary-login").classList.add("hidden");
     api("/me").then(({ user }) => {
         const name = user?.name?.trim();
         if (name) $("#hero-title").textContent = `Welcome back, ${name}`;
