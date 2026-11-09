@@ -1,4 +1,4 @@
-import { $, hasSession, setDurationCounter, updateDurationCounters } from "/common.js";
+import { $, api, clearSession, hasSession, setDurationCounter, updateDurationCounters } from "/common.js";
 
 const publicDemo = $("#public-demo");
 const PUBLIC_DEMO_EVENT = "demo.status.changed";
@@ -135,13 +135,24 @@ async function startRealtime() {
     await channel.subscribe(PUBLIC_DEMO_EVENT, connection.onMessage);
 }
 
+const logoutButton = $("#home-logout-button");
+logoutButton.addEventListener("click", () => {
+    clearSession();
+    location.assign("/");
+});
+
 if (hasSession()) {
     $("#home-login-link").classList.add("hidden");
-    $("#home-nav-cta").textContent = "Open dashboard";
-    $("#home-nav-cta").href = "/app/doors";
+    logoutButton.classList.remove("hidden");
+    $("#hero-title").textContent = "Welcome back";
     $("#home-primary-cta").innerHTML = 'Open your doors <svg aria-hidden="true"><use href="#icon-arrow"></use></svg>';
     $("#home-primary-cta").href = "/app/doors";
-    $("#home-secondary-login").classList.add("hidden");
+    api("/me").then(({ user }) => {
+        const name = user?.name?.trim();
+        if (name) $("#hero-title").textContent = `Welcome back, ${name}`;
+    }).catch(error => {
+        if (error.status !== 401) console.error("Could not load the signed-in user's name:", error);
+    });
 }
 
 loadPublicDemo();
