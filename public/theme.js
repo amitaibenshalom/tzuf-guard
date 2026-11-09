@@ -3,7 +3,7 @@
     const storageKey = "tzufguard_theme";
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
     const validPreference = value => ["light", "dark", "system"].includes(value) ? value : "light";
-    const forceLight = /^\/(login|register)\/?$/.test(location.pathname);
+    const forceLight = location.pathname === "/" || /^\/(login|register)\/?$/.test(location.pathname);
     let preference = "light";
     try {
         preference = validPreference(localStorage.getItem(storageKey));
