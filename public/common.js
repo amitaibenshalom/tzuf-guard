@@ -82,8 +82,10 @@ export function formatElapsed(totalSeconds) {
     const hours = Math.floor((total % 86400) / 3600);
     const minutes = Math.floor((total % 3600) / 60);
     const seconds = total % 60;
-    const clock = [hours, minutes, seconds].map(value => String(value).padStart(2, "0")).join(":");
-    return days ? `${days}d ${clock}` : clock;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
 }
 
 export function durationText(status, startedAt) {
