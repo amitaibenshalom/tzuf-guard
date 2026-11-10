@@ -175,6 +175,9 @@ svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-
 .live-demo__copy p { margin: 0 0 5px; color: rgba(255,255,255,.67); font-size: .88rem; font-weight: 700; }
 .live-demo__copy strong { display: block; color: #fff; font-size: clamp(2.6rem, 4.8vw, 4.1rem); line-height: .95; letter-spacing: -.06em; }
 .live-demo__copy > span { display: block; margin-top: 10px; color: var(--demo-accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.live-demo__copy .state-timing { justify-items: start; gap: 4px; font-family: inherit; white-space: normal; }
+.live-demo__copy .state-duration { color: rgba(255,255,255,.84); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; }
+.live-demo__copy .state-started-at { color: rgba(255,255,255,.62); font-size: .7rem; text-align: left; }
 @keyframes demo-pulse { 50% { opacity: .35; transform: scale(.8); } }
 
 /* Authentication */

@@ -145,6 +145,9 @@ export function updateDurationCounters() {
     $$('[data-state-started-at]').forEach(element => {
         element.textContent = statusStartedText(element.dataset.stateStatus, element.dataset.stateStartedAt);
     });
+    $$('[data-relative-time]').forEach(element => {
+        element.textContent = `Last seen ${relativeTime(element.dataset.relativeTime)}`;
+    });
 }
 
 export function durationMarkup(door) {

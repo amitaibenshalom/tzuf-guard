@@ -1,4 +1,4 @@
-import { $, api, clearSession, hasSession, setDurationCounter, updateDurationCounters } from "/common.js";
+import { $, api, clearSession, durationMarkup, escapeHtml, hasSession, relativeTime, updateDurationCounters } from "/common.js";
 
 const publicDemo = $("#public-demo");
 const PUBLIC_DEMO_EVENT = "demo.status.changed";
@@ -33,6 +33,22 @@ function durationStartedAt(duration) {
     return new Date(Date.now() - Math.max(0, Number(duration)) * 1000).toISOString();
 }
 
+function demoTimingMarkup(payload, online) {
+    const status = ["opened", "closed"].includes(payload.status) ? payload.status : null;
+    const lastSeenAt = durationStartedAt(payload.last_seen_seconds);
+    if (!online) {
+        const lastKnown = status === "opened" ? "Open" : status === "closed" ? "Closed" : "Unknown";
+        const timestamp = escapeHtml(lastSeenAt || "");
+        return `<span class="state-timing"><span class="state-duration">Last known: ${lastKnown}</span><span class="state-started-at" data-relative-time="${timestamp}">Last seen ${escapeHtml(relativeTime(lastSeenAt))}</span></span>`;
+    }
+    return durationMarkup({
+        last_seen_at: lastSeenAt,
+        is_online: true,
+        last_status: status,
+        status_changed_at: durationStartedAt(payload.duration_seconds),
+    });
+}
+
 function renderPublicDemo(payload) {
     const available = payload?.available === true;
     const status = available ? payload.status : null;
@@ -43,17 +59,14 @@ function renderPublicDemo(payload) {
     if (available && payload.online === false && payload.last_seen_seconds !== null && payload.last_seen_seconds !== undefined) {
         publicDemo.classList.add("is-offline");
         $("#demo-door-status").textContent = "Offline";
-        delete detail.dataset.durationStatus;
-        delete detail.dataset.durationStartedAt;
-        const minutes = Math.max(10, Math.floor(Number(payload.last_seen_seconds || 600) / 60));
-        detail.textContent = `No sensor signal for ${minutes} minutes`;
+        detail.innerHTML = demoTimingMarkup(payload, false);
         return;
     }
 
     if (payload?.last_seen_seconds !== null && payload?.last_seen_seconds !== undefined && ["opened", "closed"].includes(status)) {
         publicDemo.classList.add(status === "opened" ? "is-open" : "is-closed");
         $("#demo-door-status").textContent = status === "opened" ? "Open" : "Closed";
-        setDurationCounter(detail, status, durationStartedAt(payload.duration_seconds));
+        detail.innerHTML = demoTimingMarkup(payload, true);
         return;
     }
 
