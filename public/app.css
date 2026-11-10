@@ -339,9 +339,9 @@ input::placeholder { color: var(--ink-muted); }
 .sharing-list { display: grid; gap: 7px; }
 .sharing-person { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 9px 0; }
 .sharing-person > div { min-width: 0; flex: 1; }
-.sharing-person strong, .sharing-person span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sharing-person strong { font-size: .83rem; }
-.sharing-person span { margin-top: 3px; color: var(--ink-tertiary); font-size: .72rem; }
+.sharing-person > div > strong, .sharing-person > div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sharing-person > div > strong { font-size: .83rem; }
+.sharing-person > div > span { margin-top: 3px; color: var(--ink-tertiary); font-size: .72rem; }
 .sharing-avatar { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 13px; color: var(--badge-ink); background: var(--threshold-soft); font-size: .76rem; font-weight: 800; }
 .sharing-avatar--pending { color: var(--ink-tertiary); background: var(--surface-inset); }
 .sharing-avatar--pending svg { width: 17px; height: 17px; }
