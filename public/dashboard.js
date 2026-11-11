@@ -782,6 +782,7 @@ async function initialize() {
             console.error("Realtime updates are unavailable:", errorMessage(error));
         });
     } catch (error) {
+        doorLoading.classList.add("hidden");
         if (error.status !== 401) doorError.classList.remove("hidden");
     }
 }
