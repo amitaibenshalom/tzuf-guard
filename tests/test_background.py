@@ -134,6 +134,8 @@ def test_failed_publication_keeps_recoverable_jobs(client, auth, app, monkeypatc
     assert calls
     for _url, arguments in calls:
         assert set(arguments["json"]) == {"job_id"}
+        # QStash rejects colons in the public deduplication header.
+        assert ":" not in arguments["headers"]["Upstash-Deduplication-Id"]
     for job in jobs:
         job.next_dispatch_at = utcnow() - timedelta(seconds=1)
     db.session.commit()

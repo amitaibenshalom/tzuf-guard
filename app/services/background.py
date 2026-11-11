@@ -93,9 +93,9 @@ def publish_job(job):
         "Authorization": f"Bearer {current_app.config['QSTASH_TOKEN']}",
         "Content-Type": "application/json",
         "Upstash-Not-Before": str(max(math.ceil(as_utc(job.due_at).timestamp()), int(now.timestamp()))),
-        "Upstash-Deduplication-Id": f"{job.id}:{int(as_utc(job.next_dispatch_at).timestamp())}",
+        "Upstash-Deduplication-Id": f"{job.id}-{int(as_utc(job.next_dispatch_at).timestamp())}",
         "Upstash-Retries": "6",
-        "Upstash-Retry-Delay": "min(300, 10 * pow(2, retried))",
+        "Upstash-Retry-Delay": "min(300000, 10000 * pow(2, retried))",
         "Upstash-Timeout": "30s",
     }
     try:
@@ -104,8 +104,9 @@ def publish_job(job):
             json={"job_id": job.id}, headers=headers, timeout=(3, 8),
         )
         response.raise_for_status()
-    except requests.RequestException:
-        logger.warning("Background job publication failed job_id=%s", job.id)
+    except requests.RequestException as error:
+        status = error.response.status_code if error.response is not None else None
+        logger.warning("Background job publication failed job_id=%s reason=%s status=%s", job.id, type(error).__name__, status)
         job.next_dispatch_at = now + timedelta(minutes=5)
         db.session.commit()
         return False
