@@ -1,7 +1,9 @@
 import {
     $, $$, api, clearSession, durationMarkup, errorMessage, escapeHtml, formatDate,
-    hasSession, icon, relativeTime, setBusy, statusMeta, updateDurationCounters,
+    hasSession, icon, leftOpenMarkup, relativeTime, setBusy, statusMeta, updateDurationCounters,
 } from "/common.js";
+import { historyRange, eventInRange } from "/history.js";
+import { disableBrowserAlerts, initializeBrowserAlerts } from "/browser-push.js";
 
 const DOOR_STATUS_EVENT = "door.status.changed";
 const DOOR_HEALTH_EVENT = "door.health.changed";
@@ -15,7 +17,9 @@ const state = {
     activeDoor: null,
     sharingDoor: null,
     pendingInvitations: [],
-    eventPage: 1,
+    eventCursor: null,
+    historyRange: {},
+    historyRequest: 0,
     events: [],
     hasMoreEvents: false,
     confirmAction: null,
@@ -87,7 +91,7 @@ function renderDoors() {
                 <button class="icon-button icon-button--danger" data-action="delete" type="button" aria-label="Delete ${escapeHtml(door.name)}" title="Delete">${icon("trash")}</button>` : "";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
-                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${durationMarkup(door)}</span></div>
+                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${durationMarkup(door)}</span></div>${leftOpenMarkup(door)}
                 <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location} ${pinnedBadge} ${sharedBadge}</p>
                 <p class="door-seen">${icon(!hasReported ? "clock" : door.is_online ? "wifi" : "offline")}<span>${sensorLabel}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
@@ -212,7 +216,7 @@ function renderDetailStatus(door) {
     const hasReported = Boolean(door.last_seen_at);
     const status = statusMeta(door.last_status, door.is_online, hasReported);
     const reportLabel = !hasReported ? "Waiting for the first sensor report" : `${door.is_online ? "Last report" : "Last sensor contact"}: ${escapeHtml(formatDate(door.last_seen_at))}`;
-    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>${reportLabel}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}${leftOpenMarkup(door)}<p>${reportLabel}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
     const offlineAlert = $("#detail-offline-alert");
     const isOffline = hasReported && !door.is_online;
     offlineAlert.classList.toggle("hidden", !isOffline);
@@ -230,13 +234,17 @@ function renderDetailStatus(door) {
     $("#regenerate-token").classList.toggle("hidden", !isOwner);
     $("#detail-pin").checked = Boolean(door.is_pinned);
     $("#detail-notifications").checked = Boolean(door.notifications_enabled);
+    $("#detail-left-open").value = String(door.left_open_minutes || 0);
     updateDurationCounters();
 }
 
 async function updateDoorPreference(field, value) {
     const door = state.activeDoor;
     if (!door) return;
-    const previous = Boolean(door[field]);
+    const control = $(field === "is_pinned" ? "#detail-pin" : field === "left_open_minutes" ? "#detail-left-open" : "#detail-notifications");
+    if (control.disabled) return;
+    control.disabled = true;
+    const previous = door[field];
     state.activeDoor = { ...door, [field]: value };
     state.doors = state.doors.map(item => item.id === door.id ? { ...item, [field]: value } : item);
     renderDoors();
@@ -251,16 +259,19 @@ async function updateDoorPreference(field, value) {
     } catch (error) {
         state.activeDoor = { ...state.activeDoor, [field]: previous };
         state.doors = state.doors.map(item => item.id === door.id ? { ...item, [field]: previous } : item);
-        $(field === "is_pinned" ? "#detail-pin" : "#detail-notifications").checked = previous;
+        if (field === "left_open_minutes") $("#detail-left-open").value = String(previous || 0);
+        else $(field === "is_pinned" ? "#detail-pin" : "#detail-notifications").checked = previous;
         renderDoors();
         toast(errorMessage(error));
+    } finally {
+        control.disabled = false;
     }
 }
 
 function renderHistory() {
     const list = $("#history-list");
     if (!state.events.length) {
-        list.innerHTML = '<div class="history-empty">No activity yet. Events will appear after the sensor reports a change.</div>';
+        list.innerHTML = '<div class="history-empty">No activity in this date range.</div>';
     } else {
         list.innerHTML = state.events.map(event => {
             const status = statusMeta(event.status);
@@ -270,68 +281,75 @@ function renderHistory() {
     $("#load-more-events").classList.toggle("hidden", !state.hasMoreEvents);
 }
 
-async function openDoorDetail(door) {
-    state.activeDoor = door;
-    state.eventPage = 1;
-    state.events = [];
-    $("#detail-name").textContent = door.name;
-    $("#detail-location").textContent = door.location || "No location set";
-    $("#history-list").innerHTML = '<div class="history-empty">Loading activity…</div>';
-    renderDetailStatus(door);
-    openDialog(detailDialog);
-    try {
-        const [doorPayload, eventsPayload] = await Promise.all([
-            api(`/doors/${door.id}`),
-            api(`/doors/${door.id}/events?page=1&per_page=30`),
-        ]);
-        state.activeDoor = doorPayload.door;
-        state.events = eventsPayload.events;
-        state.hasMoreEvents = eventsPayload.pagination.has_more;
-        $("#detail-name").textContent = state.activeDoor.name;
-        $("#detail-location").textContent = state.activeDoor.location || "No location set";
-        renderDetailStatus(state.activeDoor);
-        renderHistory();
-    } catch (error) {
-        $("#history-list").innerHTML = `<div class="history-empty">${escapeHtml(errorMessage(error))}</div>`;
-    }
-}
-
-async function loadMoreEvents() {
-    if (!state.activeDoor || !state.hasMoreEvents) return;
+async function loadHistory(append = false) {
+    const doorId = state.activeDoor?.id;
+    if (!doorId) return;
+    const requestId = ++state.historyRequest;
+    const query = new URLSearchParams({ per_page: "30", ...state.historyRange });
+    if (append && state.eventCursor) query.set("cursor", state.eventCursor);
     const button = $("#load-more-events");
     button.disabled = true;
+    if (!append) {
+        state.events = [];
+        state.hasMoreEvents = false;
+        button.classList.add("hidden");
+        $("#history-list").innerHTML = '<div class="history-empty">Loading activity…</div>';
+    }
     try {
-        const nextPage = state.eventPage + 1;
-        const payload = await api(`/doors/${state.activeDoor.id}/events?page=${nextPage}&per_page=30`);
-        state.eventPage = nextPage;
-        const knownIds = new Set(state.events.map(event => event.id));
-        state.events.push(...payload.events.filter(event => !knownIds.has(event.id)));
+        const payload = await api(`/doors/${doorId}/events?${query}`);
+        if (requestId !== state.historyRequest || state.activeDoor?.id !== doorId) return;
+        const combined = [...state.events, ...payload.events];
+        state.events = [...new Map(combined.map(event => [event.id, event])).values()]
+            .sort((a, b) => new Date(b.received_at) - new Date(a.received_at) || b.id - a.id);
+        state.eventCursor = payload.pagination.next_cursor;
         state.hasMoreEvents = payload.pagination.has_more;
         renderHistory();
     } catch (error) {
-        toast(errorMessage(error));
+        if (requestId !== state.historyRequest || state.activeDoor?.id !== doorId) return;
+        if (append) toast(errorMessage(error));
+        else $("#history-list").innerHTML = `<div class="history-empty">${escapeHtml(errorMessage(error))}</div>`;
     } finally {
-        button.disabled = false;
+        if (requestId === state.historyRequest) button.disabled = false;
     }
 }
 
-async function refreshActiveDoor() {
+async function applyHistoryFilter() {
+    try {
+        state.historyRange = historyRange($("#history-preset").value, $("#history-from").value, $("#history-through").value);
+        await loadHistory();
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+async function openDoorDetail(door) {
+    state.activeDoor = door;
+    state.eventCursor = null;
+    state.historyRange = {};
+    $("#history-preset").value = "all";
+    $("#history-custom-range").classList.add("hidden");
+    $("#detail-name").textContent = door.name;
+    $("#detail-location").textContent = door.location || "No location set";
+    renderDetailStatus(door);
+    openDialog(detailDialog);
+    await Promise.all([refreshActiveDoor(false), loadHistory()]);
+}
+
+async function loadMoreEvents() {
+    if (state.hasMoreEvents && !$("#load-more-events").disabled) await loadHistory(true);
+}
+
+async function refreshActiveDoor(refreshHistory = true) {
     const doorId = state.activeDoor?.id;
     if (!doorId) return;
     try {
-        const [doorPayload, eventsPayload] = await Promise.all([
-            api(`/doors/${doorId}`),
-            api(`/doors/${doorId}/events?page=1&per_page=30`),
-        ]);
+        const { door } = await api(`/doors/${doorId}?include_events=false`);
         if (state.activeDoor?.id !== doorId) return;
-        state.activeDoor = doorPayload.door;
-        state.events = eventsPayload.events;
-        state.eventPage = 1;
-        state.hasMoreEvents = eventsPayload.pagination.has_more;
-        $("#detail-name").textContent = state.activeDoor.name;
-        $("#detail-location").textContent = state.activeDoor.location || "No location set";
-        renderDetailStatus(state.activeDoor);
-        renderHistory();
+        state.activeDoor = door;
+        $("#detail-name").textContent = door.name;
+        $("#detail-location").textContent = door.location || "No location set";
+        renderDetailStatus(door);
+        if (refreshHistory) await loadHistory();
     } catch (error) {
         if (error.status !== 401) toast("Live state could not be refreshed.");
     }
@@ -351,7 +369,7 @@ function applyRealtimeDoorUpdate(payload) {
     renderDetailStatus(state.activeDoor);
 
     const doorEvent = payload.event;
-    if (doorEvent && !state.events.some(item => item.id === doorEvent.id)) {
+    if (doorEvent && eventInRange(doorEvent, state.historyRange) && !state.events.some(item => item.id === doorEvent.id)) {
         state.events.unshift(doorEvent);
         renderHistory();
     }
@@ -515,11 +533,13 @@ async function sendDoorInvitation(event) {
         inviteLinkValue.dataset.url = payload.invitation_url;
         $("#invite-link-message").textContent = payload.email_sent
             ? `Invitation email sent to ${payload.invitation.email}. You can also share the link directly.`
-            : `Email could not be sent to ${payload.invitation.email}. You can still share the link directly.`;
+            : payload.email_delivery === "queued"
+                ? `Invitation email is queued for ${payload.invitation.email}. You can also share the link directly.`
+                : `Email could not be sent to ${payload.invitation.email}. You can still share the link directly.`;
         $("#invite-link-fallback").classList.remove("hidden");
         toast(payload.email_sent
             ? `Invitation email sent to ${payload.invitation.email}.`
-            : "Email could not be sent. The invite link is ready to share.");
+            : payload.email_delivery === "queued" ? "Invitation email queued. The link is ready to share." : "Email could not be sent. The invite link is ready to share.");
         renderSharing(await api(`/doors/${state.sharingDoor.id}/sharing`));
     } catch (error) {
         errorNode.textContent = errorMessage(error);
@@ -632,7 +652,8 @@ async function copyToken() {
 }
 
 function bindEvents() {
-    $("#logout-button").addEventListener("click", () => {
+    $("#logout-button").addEventListener("click", async () => {
+        await disableBrowserAlerts().catch(() => undefined);
         stopRealtime();
         clearSession();
         location.assign("/");
@@ -673,6 +694,13 @@ function bindEvents() {
     $("#copy-token-button").addEventListener("click", copyToken);
     $("#token-done-button").addEventListener("click", () => closeDialog(tokenDialog));
     $("#load-more-events").addEventListener("click", loadMoreEvents);
+    $("#detail-left-open").addEventListener("change", event => updateDoorPreference("left_open_minutes", Number(event.target.value)));
+    $("#history-preset").addEventListener("change", () => {
+        const custom = $("#history-preset").value === "custom";
+        $("#history-custom-range").classList.toggle("hidden", !custom);
+        if (!custom) applyHistoryFilter();
+    });
+    $("#history-apply").addEventListener("click", applyHistoryFilter);
     $("#confirm-delete-button").addEventListener("click", runConfirmAction);
     $("#regenerate-token").addEventListener("click", confirmRegenerateToken);
     $("#firmware-update-button").addEventListener("click", requestFirmwareUpdate);
@@ -754,6 +782,10 @@ async function initialize() {
         $("#user-greeting").textContent = state.user?.name || state.user?.email || "Account";
         $("#user-avatar").textContent = (state.user?.name || state.user?.email || "A").charAt(0).toUpperCase();
         await loadDoors();
+        const requestedDoor = Number(new URLSearchParams(location.search).get("door"));
+        const notificationDoor = state.doors.find(door => door.id === requestedDoor);
+        if (notificationDoor) await openDoorDetail(notificationDoor);
+        initializeBrowserAlerts().catch(error => console.error("Browser alerts unavailable:", errorMessage(error)));
         await loadPendingInvitations();
         startRealtime().catch(error => {
             console.error("Realtime updates are unavailable:", errorMessage(error));

@@ -13,7 +13,7 @@ from app.security import DOOR_TOKEN_WORDS, hash_reset_token
 from app.services.notifications import NotificationService
 from app.services.realtime import RealtimeService
 
-from .conftest import auth_headers, login_user, register_user
+from .conftest import auth_headers, login_user, register_user, qstash_headers
 
 
 def test_production_config_requires_turso(monkeypatch):
@@ -755,15 +755,10 @@ def test_health_cron_marks_sensor_offline_once_and_heartbeat_recovers(
         door.last_seen_at = utcnow() - timedelta(minutes=11)
         db.session.commit()
 
-    unauthorized = client.get("/api/internal/device-health")
-    first = client.get(
-        "/api/internal/device-health",
-        headers={"Authorization": f"Bearer {app.config['CRON_SECRET']}"},
-    )
-    second = client.get(
-        "/api/internal/device-health",
-        headers={"Authorization": f"Bearer {app.config['CRON_SECRET']}"},
-    )
+    path = "/api/internal/maintenance"
+    unauthorized = client.post(path, json={})
+    first = client.post(path, data="{}", headers=qstash_headers(app, path))
+    second = client.post(path, data="{}", headers=qstash_headers(app, path))
 
     assert unauthorized.status_code == 401
     assert first.get_json()["newly_offline"] == 1
@@ -1094,11 +1089,13 @@ def test_door_edit_history_pagination_and_delete(client, auth):
     assert updated.get_json()["door"]["name"] == "Back Door"
     assert history.status_code == 200
     assert len(history.get_json()["events"]) == 2
+    assert history.get_json()["pagination"]["next_cursor"]
     assert history.get_json()["pagination"] == {
         "page": 1,
         "per_page": 2,
         "total": 3,
         "has_more": True,
+        "next_cursor": history.get_json()["pagination"]["next_cursor"],
     }
 
     deleted = client.delete(f"/api/doors/{created['id']}", headers=auth)
@@ -1233,6 +1230,7 @@ def test_status_change_sends_expo_push(client, auth, monkeypatch):
         "door_id": str(response.get_json()["door"]["id"]),
         "status": "opened",
         "previous_status": "",
+        "status_changed_at": response.get_json()["door"]["status_changed_at"],
     }
     assert kwargs["json"]["sound"] == "default"
     assert kwargs["json"]["priority"] == "high"

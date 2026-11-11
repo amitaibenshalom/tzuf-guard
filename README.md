@@ -48,7 +48,13 @@ NOTIFICATIONS_ENABLED=true
 ABLY_API_KEY=<server-only Ably API key with publish and subscribe capability>
 ABLY_TOKEN_TTL_SECONDS=3600
 # Optional; a dedicated health-check secret is derived from SECRET_KEY when omitted.
-CRON_SECRET=
+QSTASH_URL=https://qstash-us-east-1.upstash.io
+QSTASH_TOKEN=
+QSTASH_CURRENT_SIGNING_KEY=
+QSTASH_NEXT_SIGNING_KEY=
+PUBLIC_APP_URL=https://amitaibenshalom.com
+VAPID_PRIVATE_KEY=
+VAPID_PUBLIC_KEY=
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
@@ -172,13 +178,47 @@ Every report refreshes the door's current status and last-seen time. History is
 created only when the status changes, so reconnects and repeated reports do not
 pollute the activity timeline.
 
-Sensors send a heartbeat every five minutes. The secured GitHub Actions health
-sweep runs on the same interval and marks a sensor offline after two missed
-heartbeats (10 minutes). Offline transitions publish one realtime update and
-one push alert; normal heartbeats do not publish messages or create history
-entries. The workflow secret `DEVICE_HEALTH_CRON_SECRET` must match
-`CRON_SECRET`, or the dedicated value derived from `SECRET_KEY` when the
-Vercel override is omitted.
+Sensors send a heartbeat every five minutes. A signed QStash maintenance call
+runs every five minutes and marks a sensor offline after two missed heartbeats
+(10 minutes). Offline transitions publish one realtime update and one push alert.
+Normal heartbeats do not create activity history entries.
+
+## Background jobs and reminders
+
+Configure the QStash URL, token, and both signing keys in the Production
+environment, then apply migrations and create the recurring schedules:
+
+```bash
+flask --app app:create_app db upgrade
+flask --app app:create_app maintenance sync-schedules
+```
+
+The command updates stable schedule IDs: a five-minute maintenance sweep and a
+daily cleanup. Callbacks verify QStash signatures against `PUBLIC_APP_URL` and the
+raw request body. Preview deployments should use separate QStash resources when
+exercising background jobs.
+
+Left-open reminders are personal to each owner or member and default to Off.
+Options are 2, 5, 15, and 30 minutes from the opening report. Pending reminders
+are stored in Turso and delivered through delayed QStash jobs. Callbacks check the
+current opening, membership, preference, and sensor health before sending.
+Reminder records identify the opening and recipient; job leases and completed
+records suppress duplicate processing. Individual successful push deliveries
+are recorded before failed deliveries are retried.
+
+Door-change pushes send immediately; failed deliveries use QStash retries.
+Failed SMTP invitation and password-reset emails are retried while their tokens
+remain valid. Job payloads are encrypted using a key derived from `SECRET_KEY`;
+QStash receives only opaque job IDs. Keep the secret stable while pending jobs
+exist. Maintenance recovers unpublished jobs. Cleanup removes expired reset
+and invitation records and completed/cancelled jobs older than seven days in
+bounded batches.
+
+Browser alerts use Web Push with VAPID keys and are enabled through the account
+menu. Keys must stay consistent across deployments. Android uses Expo push.
+History supports UTC `from` (inclusive), `until` (exclusive), and `cursor` query
+parameters. Website and Android date presets convert the viewer's calendar days
+to UTC before querying. Cursor pagination remains stable when new events arrive.
 
 ## Firmware releases
 

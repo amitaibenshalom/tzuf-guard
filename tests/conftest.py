@@ -1,4 +1,8 @@
 import pytest
+import base64
+import hashlib
+import time
+import jwt
 
 from app import create_app
 from app.extensions import db
@@ -35,6 +39,16 @@ def login_user(client, email="user@example.com", password="password123"):
 
 def auth_headers(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def qstash_headers(app, path, body="{}", key=None):
+    now = int(time.time())
+    signature = jwt.encode({
+        "iss": "Upstash", "sub": app.config["PUBLIC_APP_URL"] + path,
+        "iat": now, "nbf": now - 1, "exp": now + 300,
+        "body": base64.urlsafe_b64encode(hashlib.sha256(body.encode()).digest()).decode().rstrip("="),
+    }, key or app.config["QSTASH_CURRENT_SIGNING_KEY"], algorithm="HS256")
+    return {"Upstash-Signature": signature, "Content-Type": "application/json"}
 
 
 @pytest.fixture()

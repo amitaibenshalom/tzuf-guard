@@ -150,6 +150,15 @@ export function updateDurationCounters() {
     $$('[data-relative-time]').forEach(element => {
         element.textContent = `Last seen ${relativeTime(element.dataset.relativeTime)}`;
     });
+    $$('[data-left-open-at]').forEach(element => {
+        const overdue = Date.now() - new Date(element.dataset.leftOpenAt).getTime() >= Number(element.dataset.leftOpenMinutes) * 60000;
+        element.classList.toggle("hidden", !overdue);
+    });
+}
+
+export function leftOpenMarkup(door) {
+    if (!door.is_online || door.last_status !== "opened" || !door.status_changed_at || !door.left_open_minutes || !door.notifications_enabled) return "";
+    return `<span class="left-open-indicator hidden" data-left-open-at="${escapeHtml(door.status_changed_at)}" data-left-open-minutes="${Number(door.left_open_minutes)}">Left open</span>`;
 }
 
 export function durationMarkup(door) {

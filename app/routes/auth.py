@@ -161,6 +161,8 @@ def forgot_password():
                 "Password reset email failed user_id=%s",
                 user.id,
             )
+            from app.services.background import queue_email_retry
+            queue_email_retry("password_reset", token_record, reset_token)
 
     return jsonify({"message": "If that email exists, reset instructions were sent."})
 

@@ -223,9 +223,15 @@ def create_door_invitation(current_user, door_id):
         current_app.logger.exception("Door invitation email failed invitation_id=%s", invitation.id)
         email_sent = False
 
+    email_queued = False
+    if not email_sent:
+        from app.services.background import queue_email_retry
+        email_queued = queue_email_retry("invitation", invitation, raw_token)
+
     response = {
         "invitation": door_invitation_to_dict(invitation),
         "email_sent": email_sent,
+        "email_delivery": "sent" if email_sent else "queued" if email_queued else "unavailable",
         "invitation_url": (
             f"{current_app.config['PUBLIC_APP_URL']}/invite?token={raw_token}"
         ),

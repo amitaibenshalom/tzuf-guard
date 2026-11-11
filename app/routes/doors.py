@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 
 from app.errors import ApiError
@@ -7,6 +10,9 @@ from app.models import Door, DoorEvent, DoorMembership, utcnow
 from app.security import generate_door_token, hash_door_token
 from app.serializers import door_event_to_dict, door_to_dict
 from app.services.doors import create_door_for_user
+from app.services.background import REMINDER_MINUTES, dispatch_pending, prepare_reminders
+from app.device_state import as_utc
+from app.serializers import isoformat
 from app.services.firmware import load_release, version_key
 from app.services.realtime import realtime_service
 from app.validation import boolean_field, require_json, string_field
@@ -60,6 +66,8 @@ def list_doors(current_user):
 @current_user_required
 def get_door(current_user, door_id):
     door, _membership = get_door_access_or_404(current_user, door_id)
+    if request.args.get("include_events") == "false":
+        return jsonify({"door": door_to_dict(door, events=[], viewer=current_user)})
     events = (
         DoorEvent.query.filter_by(door_id=door.id)
         .order_by(DoorEvent.received_at.desc())
@@ -79,11 +87,39 @@ def list_door_events(current_user, door_id):
     except ValueError as exc:
         raise ApiError("Invalid pagination values.", 400, "validation_error") from exc
 
-    query = DoorEvent.query.filter_by(door_id=door.id).order_by(
-        DoorEvent.received_at.desc()
-    )
+    query = DoorEvent.query.filter_by(door_id=door.id)
+    try:
+        start = as_utc(datetime.fromisoformat(request.args["from"].replace("Z", "+00:00"))) if request.args.get("from") else None
+        end = as_utc(datetime.fromisoformat(request.args["until"].replace("Z", "+00:00"))) if request.args.get("until") else None
+        if start and end and start >= end:
+            raise ValueError("Reversed date range")
+    except (ValueError, OverflowError) as exc:
+        raise ApiError("Choose a valid history date range.", 400, "validation_error") from exc
+    if start:
+        query = query.filter(DoorEvent.received_at >= start)
+    if end:
+        query = query.filter(DoorEvent.received_at < end)
     total = query.count()
-    events = query.offset((page - 1) * per_page).limit(per_page).all()
+    cursor = request.args.get("cursor")
+    if cursor:
+        try:
+            cursor_time, cursor_id = cursor.rsplit("|", 1)
+            cursor_time = as_utc(datetime.fromisoformat(cursor_time))
+            cursor_id = int(cursor_id)
+            if not 0 < cursor_id < 2 ** 63:
+                raise ValueError("Invalid event ID")
+        except (ValueError, OverflowError) as exc:
+            raise ApiError("Invalid history cursor.", 400, "validation_error") from exc
+        query = query.filter(or_(
+            DoorEvent.received_at < cursor_time,
+            and_(DoorEvent.received_at == cursor_time, DoorEvent.id < cursor_id),
+        ))
+    query = query.order_by(DoorEvent.received_at.desc(), DoorEvent.id.desc())
+    if not cursor:
+        query = query.offset((page - 1) * per_page)
+    rows = query.limit(per_page + 1).all()
+    events = rows[:per_page]
+    next_cursor = f"{isoformat(events[-1].received_at)}|{events[-1].id}" if len(rows) > per_page else None
     return jsonify(
         {
             "events": [door_event_to_dict(event) for event in events],
@@ -91,7 +127,8 @@ def list_door_events(current_user, door_id):
                 "page": page,
                 "per_page": per_page,
                 "total": total,
-                "has_more": page * per_page < total,
+                "has_more": next_cursor is not None,
+                "next_cursor": next_cursor,
             },
         }
     )
@@ -128,6 +165,13 @@ def patch_door(current_user, door_id):
             membership.is_pinned = boolean_field(data, "is_pinned")
         else:
             door.is_pinned = boolean_field(data, "is_pinned")
+    if "left_open_minutes" in data:
+        minutes = data["left_open_minutes"]
+        if type(minutes) is not int or minutes not in REMINDER_MINUTES:
+            raise ApiError("Choose Off, 2, 5, 15, or 30 minutes.", 400, "validation_error")
+        (membership or door).left_open_minutes = minutes
+    if "left_open_minutes" in data or "notifications_enabled" in data:
+        prepare_reminders(door)
 
     try:
         db.session.commit()
@@ -135,6 +179,8 @@ def patch_door(current_user, door_id):
         db.session.rollback()
         raise ApiError("Door token is already registered.", 409, "duplicate_token") from exc
 
+    realtime_service.publish_door_device_changed(door)
+    dispatch_pending(door_id=door.id)
     return jsonify({"door": door_to_dict(door, viewer=current_user)})
 
 

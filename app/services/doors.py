@@ -9,6 +9,7 @@ from app.services.device_health import (
     record_device_contact,
 )
 from app.services.notifications import notification_service
+from app.services.background import dispatch_pending, prepare_reminders
 from app.services.realtime import realtime_service
 
 
@@ -57,11 +58,13 @@ def update_door_status(token, status, device_name=None, firmware_version=None):
             received_at=received_at,
         )
         db.session.add(event)
+    prepare_reminders(door)
     db.session.commit()
 
     if status_changed:
         realtime_service.publish_door_status_changed(door, event)
         notification_service.send_door_status_changed(door, previous_status)
     publish_contact_transitions(door, transitions)
+    dispatch_pending(door_id=door.id)
 
     return door, event, status_changed

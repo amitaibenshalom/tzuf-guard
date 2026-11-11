@@ -69,6 +69,7 @@ class Door(TimestampMixin, db.Model):
     firmware_update_target_version = db.Column(db.String(32), nullable=True)
     notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
+    left_open_minutes = db.Column(db.Integer, default=0, nullable=False)
 
     user = db.relationship("User", back_populates="doors")
     memberships = db.relationship(
@@ -96,6 +97,7 @@ class DoorMembership(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
+    left_open_minutes = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
     door = db.relationship("Door", back_populates="memberships")
@@ -164,3 +166,35 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
     user = db.relationship("User", back_populates="password_reset_tokens")
+
+
+class BackgroundJob(db.Model):
+    __tablename__ = "background_jobs"
+
+    id = db.Column(db.String(32), primary_key=True)
+    deduplication_key = db.Column(db.String(255), unique=True, nullable=False)
+    kind = db.Column(db.String(32), nullable=False)
+    door_id = db.Column(db.Integer, db.ForeignKey("doors.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    # Email links and subscription details stay encrypted in the database.
+    payload = db.Column(db.Text, nullable=False)
+    due_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    next_dispatch_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
+    lease_until = db.Column(db.DateTime(timezone=True), nullable=True)
+    attempts = db.Column(db.Integer, default=0, nullable=False)
+    completed_at = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
+    cancelled_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    door = db.relationship("Door", backref=db.backref("background_jobs", cascade="all, delete-orphan"))
+    user = db.relationship("User", backref=db.backref("background_jobs", cascade="all, delete-orphan"))
+
+
+class WebPushSubscription(db.Model):
+    __tablename__ = "web_push_subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    endpoint_hash = db.Column(db.String(64), nullable=False, unique=True)
+    subscription = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    user = db.relationship("User", backref=db.backref("web_push_subscriptions", cascade="all, delete-orphan"))

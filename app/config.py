@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -19,17 +17,6 @@ DEFAULT_GOOGLE_OAUTH_CLIENT_IDS = ",".join(
 DEFAULT_GOOGLE_WEB_CLIENT_ID = (
     "62060365746-ht958df0nupek5s87uuthu274qin8s98.apps.googleusercontent.com"
 )
-DEVICE_HEALTH_CRON_CONTEXT = b"tzufguard-device-health-cron-v1"
-
-
-def derive_device_health_cron_secret(secret_key):
-    return hmac.new(
-        secret_key.encode("utf-8"),
-        DEVICE_HEALTH_CRON_CONTEXT,
-        hashlib.sha256,
-    ).hexdigest()
-
-
 def bool_from_env(name, default=False):
     value = os.getenv(name)
     if value is None:
@@ -72,9 +59,15 @@ class Config:
         ]
 
     NOTIFICATIONS_ENABLED = bool_from_env("NOTIFICATIONS_ENABLED", default=True)
+    QSTASH_URL = os.getenv("QSTASH_URL", "https://qstash-us-east-1.upstash.io").rstrip("/")
+    QSTASH_TOKEN = os.getenv("QSTASH_TOKEN", "").strip()
+    QSTASH_CURRENT_SIGNING_KEY = os.getenv("QSTASH_CURRENT_SIGNING_KEY", "").strip()
+    QSTASH_NEXT_SIGNING_KEY = os.getenv("QSTASH_NEXT_SIGNING_KEY", "").strip()
+    VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "").strip()
+    VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "").strip()
+    VAPID_SUBJECT = "mailto:amitai@amitaibenshalom.com"
     ABLY_API_KEY = os.getenv("ABLY_API_KEY", "").strip()
     ABLY_TOKEN_TTL_SECONDS = int(os.getenv("ABLY_TOKEN_TTL_SECONDS", "3600"))
-    CRON_SECRET = os.getenv("CRON_SECRET", "").strip()
     DEVICE_HEARTBEAT_INTERVAL_SECONDS = 300
     DEVICE_OFFLINE_AFTER_SECONDS = 600
     FIRMWARE_DIRECTORY = str(BASE_DIR / "firmware")
@@ -120,10 +113,6 @@ class Config:
         jwt_secret_key = os.getenv("JWT_SECRET_KEY", secret_key).strip()
         app.config["SECRET_KEY"] = secret_key
         app.config["JWT_SECRET_KEY"] = jwt_secret_key
-        app.config["CRON_SECRET"] = (
-            os.getenv("CRON_SECRET", "").strip()
-            or derive_device_health_cron_secret(secret_key)
-        )
         app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(
             seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_SECONDS", "2592000"))
         )
@@ -149,6 +138,11 @@ class Config:
 
 class TestingConfig(Config):
     TESTING = True
+    QSTASH_TOKEN = ""
+    QSTASH_CURRENT_SIGNING_KEY = "test-current-signing-key-with-thirty-two-bytes"
+    QSTASH_NEXT_SIGNING_KEY = "test-next-signing-key-with-at-least-thirty-two-bytes"
+    VAPID_PRIVATE_KEY = ""
+    VAPID_PUBLIC_KEY = ""
     SECRET_KEY = "test-secret-key-with-at-least-thirty-two-bytes"
     JWT_SECRET_KEY = "test-jwt-secret-with-at-least-thirty-two-bytes"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
@@ -157,7 +151,6 @@ class TestingConfig(Config):
     NOTIFICATIONS_ENABLED = True
     ABLY_API_KEY = ""
     ABLY_TOKEN_TTL_SECONDS = 3600
-    CRON_SECRET = "test-cron-secret-with-at-least-thirty-two-bytes"
     DEVICE_HEARTBEAT_INTERVAL_SECONDS = 300
     DEVICE_OFFLINE_AFTER_SECONDS = 600
     PUBLIC_DEMO_DOOR_ID = ""

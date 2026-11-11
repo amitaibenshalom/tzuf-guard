@@ -48,6 +48,7 @@ def door_to_dict(door, include_events=False, events=None, viewer=None):
         "firmware_update_target_version": door.firmware_update_target_version,
         "notifications_enabled": membership.notifications_enabled if membership else door.notifications_enabled,
         "is_pinned": membership.is_pinned if membership else door.is_pinned,
+        "left_open_minutes": membership.left_open_minutes if membership else door.left_open_minutes,
         "access_role": "member" if membership else "owner",
         "member_count": len(door.memberships),
         "created_at": isoformat(door.created_at),
