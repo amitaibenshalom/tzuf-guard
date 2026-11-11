@@ -249,3 +249,26 @@ def test_cleanup_preserves_active_tokens_and_jobs(client, auth, app):
     assert response.status_code == 200
     assert PasswordResetToken.query.one().token_hash == "active"
     assert BackgroundJob.query.one().id == active.id
+
+
+def test_cleanup_continues_when_a_batch_is_full(client, auth, app, monkeypatch):
+    from app.models import PasswordResetToken
+    from app.services.background import cleanup_expired_records
+    app.config["QSTASH_TOKEN"] = "test-token"
+    user_id = User.query.one().id
+    db.session.add_all([
+        PasswordResetToken(user_id=user_id, token_hash=f"expired-{number}", expires_at=utcnow() - timedelta(days=1))
+        for number in range(201)
+    ])
+    db.session.commit()
+    published = []
+    monkeypatch.setattr("app.services.background.publish_job", lambda job: published.append(job.id) or True)
+    removed = cleanup_expired_records()
+    assert removed["password_reset_tokens"] == 200
+    assert PasswordResetToken.query.count() == 1
+    continuation = BackgroundJob.query.filter_by(kind="cleanup").one()
+    assert published == [continuation.id]
+    continuation.due_at = utcnow() - timedelta(seconds=1)
+    db.session.commit()
+    process_job(continuation.id)
+    assert PasswordResetToken.query.count() == 0

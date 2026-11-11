@@ -168,6 +168,8 @@ def process_job(job_id):
         elif job.kind == "notification":
             from app.services.notifications import notification_service
             notification_service.deliver_job(job, payload)
+        elif job.kind == "cleanup":
+            cleanup_expired_records()
         else:
             raise ValueError("Unsupported job type")
         job.completed_at = utcnow()
@@ -255,5 +257,13 @@ def cleanup_expired_records():
         for row in rows:
             db.session.delete(row)
         removed[model.__tablename__] = len(rows)
+    continuation = None
+    if enabled() and any(count == 200 for count in removed.values()):
+        continuation = create_job(
+            "cleanup", {}, key=f"cleanup:{uuid4().hex}",
+            due_at=now + timedelta(seconds=30),
+        )
     db.session.commit()
+    if continuation:
+        publish_job(continuation)
     return removed
