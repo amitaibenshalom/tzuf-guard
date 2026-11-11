@@ -176,7 +176,7 @@ class BackgroundJob(db.Model):
     kind = db.Column(db.String(32), nullable=False)
     door_id = db.Column(db.Integer, db.ForeignKey("doors.id"), nullable=True, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    # Email links and subscription details stay encrypted in the database.
+    # Email links and notification payloads stay encrypted in the database.
     payload = db.Column(db.Text, nullable=False)
     due_at = db.Column(db.DateTime(timezone=True), nullable=False)
     next_dispatch_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
@@ -187,14 +187,3 @@ class BackgroundJob(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
     door = db.relationship("Door", backref=db.backref("background_jobs", cascade="all, delete-orphan"))
     user = db.relationship("User", backref=db.backref("background_jobs", cascade="all, delete-orphan"))
-
-
-class WebPushSubscription(db.Model):
-    __tablename__ = "web_push_subscriptions"
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    endpoint_hash = db.Column(db.String(64), nullable=False, unique=True)
-    subscription = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
-    user = db.relationship("User", backref=db.backref("web_push_subscriptions", cascade="all, delete-orphan"))

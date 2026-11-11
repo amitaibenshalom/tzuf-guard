@@ -53,8 +53,6 @@ QSTASH_TOKEN=
 QSTASH_CURRENT_SIGNING_KEY=
 QSTASH_NEXT_SIGNING_KEY=
 PUBLIC_APP_URL=https://amitaibenshalom.com
-VAPID_PRIVATE_KEY=
-VAPID_PUBLIC_KEY=
 JWT_ACCESS_TOKEN_EXPIRES_SECONDS=2592000
 GOOGLE_OAUTH_CLIENT_IDS=your-android-client-id.apps.googleusercontent.com,your-web-client-id.apps.googleusercontent.com
 GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
@@ -214,8 +212,7 @@ exist. Maintenance recovers unpublished jobs. Cleanup removes expired reset
 and invitation records and completed/cancelled jobs older than seven days in
 bounded batches.
 
-Browser alerts use Web Push with VAPID keys and are enabled through the account
-menu. Keys must stay consistent across deployments. Android uses Expo push.
+Android alerts use Expo push.
 History supports UTC `from` (inclusive), `until` (exclusive), and `cursor` query
 parameters. Website and Android date presets convert the viewer's calendar days
 to UTC before querying. Cursor pagination remains stable when new events arrive.

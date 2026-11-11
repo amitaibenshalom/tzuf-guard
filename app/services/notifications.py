@@ -1,5 +1,4 @@
 import logging
-import json
 
 import requests
 from flask import current_app
@@ -94,9 +93,7 @@ class NotificationService:
                 self.send_push(device, title, body, data)
 
     def deliver_job(self, job, payload):
-        from app.services.background import decrypt_payload, encrypt_payload
-        from app.models import WebPushSubscription
-        from pywebpush import WebPushException, webpush
+        from app.services.background import encrypt_payload
 
         if not current_app.config["NOTIFICATIONS_ENABLED"] or job.user is None:
             return
@@ -130,30 +127,6 @@ class NotificationService:
             else:
                 failed = True
 
-        for subscription in WebPushSubscription.query.filter_by(user_id=job.user_id).all():
-            delivery_key = f"web:{subscription.id}"
-            if delivery_key in delivered:
-                continue
-            try:
-                webpush(
-                    subscription_info=decrypt_payload(subscription.subscription),
-                    data=json.dumps({
-                        "title": payload["title"], "body": payload["body"],
-                        "data": payload.get("data", {}), "tag": job.id,
-                    }),
-                    vapid_private_key=current_app.config["VAPID_PRIVATE_KEY"],
-                    vapid_claims={"sub": current_app.config["VAPID_SUBJECT"]},
-                    ttl=300, timeout=8,
-                )
-            except WebPushException as error:
-                if error.response is not None and error.response.status_code in (404, 410):
-                    db.session.delete(subscription)
-                else:
-                    failed = True
-                    continue
-            delivered.append(delivery_key)
-            job.payload = encrypt_payload(payload)
-            db.session.commit()
         if failed:
             raise RuntimeError("Some notification deliveries failed")
 

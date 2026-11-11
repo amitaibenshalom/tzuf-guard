@@ -202,30 +202,13 @@ def test_threshold_change_cannot_send_from_an_earlier_callback(client, auth, app
     assert job.completed_at is None
 
 
-def test_browser_subscription_upsert_and_account_deletion(client, auth, app):
-    import base64
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.hazmat.primitives import serialization
-    from app.models import WebPushSubscription
-    app.config["VAPID_PRIVATE_KEY"] = "test-private-key"
-    data = {
-        "endpoint": "https://fcm.googleapis.com/fcm/send/test-endpoint",
-        "keys": {
-            "p256dh": base64.urlsafe_b64encode(ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)).decode().rstrip("="),
-            "auth": base64.urlsafe_b64encode(b"y" * 16).decode().rstrip("="),
-        },
-    }
-    path = "/api/web-push/subscriptions"
-    assert client.post(path, headers=auth, json=data).status_code == 200
-    assert client.post(path, headers=auth, json=data).status_code == 200
-    assert WebPushSubscription.query.count() == 1
-    assert data["endpoint"] not in WebPushSubscription.query.one().subscription
-    assert client.post(path, headers=auth, json={**data, "endpoint": "http://127.0.0.1/private"}).status_code == 400
+def test_browser_notifications_removed_and_account_deletion_cleans_jobs(client, auth, app):
+    assert client.get("/api/web-push/config").status_code == 404
+    assert not any(rule.rule.startswith("/api/web-push/") for rule in app.url_map.iter_rules())
     door, _ = make_open_door(client, auth, app)
     assert BackgroundJob.query.filter_by(door_id=door.id).count() == 1
     deleted = client.delete("/api/me", headers=auth, json={"confirmation_email": "user@example.com"})
     assert deleted.status_code == 200
-    assert WebPushSubscription.query.count() == 0
     assert BackgroundJob.query.count() == 0
 
 

@@ -1,7 +1,5 @@
 import { $, api, clearSession, durationMarkup, escapeHtml, hasSession, relativeTime, updateDurationCounters } from "/common.js";
 
-import { disableBrowserAlerts } from "/browser-push.js";
-
 const publicDemo = $("#public-demo");
 const PUBLIC_DEMO_EVENT = "demo.status.changed";
 const DEMO_CLIENT_STORAGE_KEY = "tzufguard_demo_client_id";
@@ -151,8 +149,7 @@ async function startRealtime() {
 }
 
 const logoutButton = $("#home-logout-button");
-logoutButton.addEventListener("click", async () => {
-    await disableBrowserAlerts().catch(() => undefined);
+logoutButton.addEventListener("click", () => {
     clearSession();
     location.assign("/");
 });

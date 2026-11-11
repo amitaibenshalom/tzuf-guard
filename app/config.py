@@ -63,9 +63,6 @@ class Config:
     QSTASH_TOKEN = os.getenv("QSTASH_TOKEN", "").strip()
     QSTASH_CURRENT_SIGNING_KEY = os.getenv("QSTASH_CURRENT_SIGNING_KEY", "").strip()
     QSTASH_NEXT_SIGNING_KEY = os.getenv("QSTASH_NEXT_SIGNING_KEY", "").strip()
-    VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "").strip()
-    VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "").strip()
-    VAPID_SUBJECT = "mailto:amitai@amitaibenshalom.com"
     ABLY_API_KEY = os.getenv("ABLY_API_KEY", "").strip()
     ABLY_TOKEN_TTL_SECONDS = int(os.getenv("ABLY_TOKEN_TTL_SECONDS", "3600"))
     DEVICE_HEARTBEAT_INTERVAL_SECONDS = 300
@@ -141,8 +138,6 @@ class TestingConfig(Config):
     QSTASH_TOKEN = ""
     QSTASH_CURRENT_SIGNING_KEY = "test-current-signing-key-with-thirty-two-bytes"
     QSTASH_NEXT_SIGNING_KEY = "test-next-signing-key-with-at-least-thirty-two-bytes"
-    VAPID_PRIVATE_KEY = ""
-    VAPID_PUBLIC_KEY = ""
     SECRET_KEY = "test-secret-key-with-at-least-thirty-two-bytes"
     JWT_SECRET_KEY = "test-jwt-secret-with-at-least-thirty-two-bytes"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"

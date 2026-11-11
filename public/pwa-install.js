@@ -1,4 +1,18 @@
 let installPrompt = null;
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then(async registrations => {
+        for (const registration of registrations) {
+            const worker = registration.active || registration.waiting || registration.installing;
+            if (!worker || new URL(worker.scriptURL).pathname !== "/notifications-sw.js") continue;
+            try {
+                const subscription = await registration.pushManager?.getSubscription();
+                if (subscription) await subscription.unsubscribe();
+            } finally {
+                await registration.unregister();
+            }
+        }
+    }).catch(() => undefined);
+}
 const installButtons = [...document.querySelectorAll("[data-install-app]")];
 const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)

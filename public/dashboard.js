@@ -1,9 +1,8 @@
 import {
     $, $$, api, clearSession, durationMarkup, errorMessage, escapeHtml, formatDate,
-    hasSession, icon, leftOpenMarkup, relativeTime, setBusy, statusMeta, updateDurationCounters,
+    hasSession, icon, relativeTime, setBusy, statusMeta, updateDurationCounters,
 } from "/common.js";
 import { historyRange, eventInRange } from "/history.js";
-import { disableBrowserAlerts, initializeBrowserAlerts } from "/browser-push.js";
 
 const DOOR_STATUS_EVENT = "door.status.changed";
 const DOOR_HEALTH_EVENT = "door.health.changed";
@@ -91,7 +90,7 @@ function renderDoors() {
                 <button class="icon-button icon-button--danger" data-action="delete" type="button" aria-label="Delete ${escapeHtml(door.name)}" title="Delete">${icon("trash")}</button>` : "";
         return `<article class="door-card" data-door-id="${door.id}">
             <button class="door-card__main" type="button" data-action="view" aria-label="View ${escapeHtml(door.name)} details">
-                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${durationMarkup(door)}</span></div>${leftOpenMarkup(door)}
+                <div class="door-card__top"><span class="status-pill ${status.className}">${status.label}</span><span class="door-card__top-meta">${durationMarkup(door)}</span></div>
                 <h2>${escapeHtml(door.name)}</h2><p class="door-location">${location} ${pinnedBadge} ${sharedBadge}</p>
                 <p class="door-seen">${icon(!hasReported ? "clock" : door.is_online ? "wifi" : "offline")}<span>${sensorLabel}</span></p>
                 <span class="door-arrow">${icon("chevron")}</span>
@@ -216,7 +215,7 @@ function renderDetailStatus(door) {
     const hasReported = Boolean(door.last_seen_at);
     const status = statusMeta(door.last_status, door.is_online, hasReported);
     const reportLabel = !hasReported ? "Waiting for the first sensor report" : `${door.is_online ? "Last report" : "Last sensor contact"}: ${escapeHtml(formatDate(door.last_seen_at))}`;
-    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}${leftOpenMarkup(door)}<p>${reportLabel}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
+    $("#detail-status").innerHTML = `<div><span class="status-pill ${status.className}">${status.label}</span>${durationMarkup(door)}<p>${reportLabel}</p></div><div><strong>${escapeHtml(door.device_name || "Sensor not connected")}</strong></div>`;
     const offlineAlert = $("#detail-offline-alert");
     const isOffline = hasReported && !door.is_online;
     offlineAlert.classList.toggle("hidden", !isOffline);
@@ -233,15 +232,13 @@ function renderDetailStatus(door) {
     $("#detail-firmware-panel").classList.toggle("hidden", !isOwner);
     $("#regenerate-token").classList.toggle("hidden", !isOwner);
     $("#detail-pin").checked = Boolean(door.is_pinned);
-    $("#detail-notifications").checked = Boolean(door.notifications_enabled);
-    $("#detail-left-open").value = String(door.left_open_minutes || 0);
     updateDurationCounters();
 }
 
 async function updateDoorPreference(field, value) {
     const door = state.activeDoor;
     if (!door) return;
-    const control = $(field === "is_pinned" ? "#detail-pin" : field === "left_open_minutes" ? "#detail-left-open" : "#detail-notifications");
+    const control = $("#detail-pin");
     if (control.disabled) return;
     control.disabled = true;
     const previous = door[field];
@@ -250,17 +247,15 @@ async function updateDoorPreference(field, value) {
     renderDoors();
     try {
         const result = await api(`/doors/${door.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ [field]: value }),
+            method: "PATCH", body: JSON.stringify({ [field]: value }),
         });
-        state.activeDoor = { ...state.activeDoor, ...result.door };
+        if (state.activeDoor?.id === door.id) state.activeDoor = { ...state.activeDoor, ...result.door };
         state.doors = state.doors.map(item => item.id === door.id ? { ...item, ...result.door } : item);
         renderDoors();
     } catch (error) {
-        state.activeDoor = { ...state.activeDoor, [field]: previous };
+        if (state.activeDoor?.id === door.id) state.activeDoor = { ...state.activeDoor, [field]: previous };
         state.doors = state.doors.map(item => item.id === door.id ? { ...item, [field]: previous } : item);
-        if (field === "left_open_minutes") $("#detail-left-open").value = String(previous || 0);
-        else $(field === "is_pinned" ? "#detail-pin" : "#detail-notifications").checked = previous;
+        control.checked = previous;
         renderDoors();
         toast(errorMessage(error));
     } finally {
@@ -652,8 +647,7 @@ async function copyToken() {
 }
 
 function bindEvents() {
-    $("#logout-button").addEventListener("click", async () => {
-        await disableBrowserAlerts().catch(() => undefined);
+    $("#logout-button").addEventListener("click", () => {
         stopRealtime();
         clearSession();
         location.assign("/");
@@ -694,7 +688,6 @@ function bindEvents() {
     $("#copy-token-button").addEventListener("click", copyToken);
     $("#token-done-button").addEventListener("click", () => closeDialog(tokenDialog));
     $("#load-more-events").addEventListener("click", loadMoreEvents);
-    $("#detail-left-open").addEventListener("change", event => updateDoorPreference("left_open_minutes", Number(event.target.value)));
     $("#history-preset").addEventListener("change", () => {
         const custom = $("#history-preset").value === "custom";
         $("#history-custom-range").classList.toggle("hidden", !custom);
@@ -707,7 +700,6 @@ function bindEvents() {
     $("#detail-share").addEventListener("click", () => openSharing(state.activeDoor));
     $("#detail-leave").addEventListener("click", leaveSharedDoor);
     $("#detail-pin").addEventListener("change", event => updateDoorPreference("is_pinned", event.target.checked));
-    $("#detail-notifications").addEventListener("change", event => updateDoorPreference("notifications_enabled", event.target.checked));
     $("#sharing-form").addEventListener("submit", sendDoorInvitation);
     $("#sharing-members").addEventListener("click", handleSharingAction);
     $("#sharing-invitations").addEventListener("click", handleSharingAction);
@@ -785,7 +777,6 @@ async function initialize() {
         const requestedDoor = Number(new URLSearchParams(location.search).get("door"));
         const notificationDoor = state.doors.find(door => door.id === requestedDoor);
         if (notificationDoor) await openDoorDetail(notificationDoor);
-        initializeBrowserAlerts().catch(error => console.error("Browser alerts unavailable:", errorMessage(error)));
         await loadPendingInvitations();
         startRealtime().catch(error => {
             console.error("Realtime updates are unavailable:", errorMessage(error));
